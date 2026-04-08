@@ -6,1125 +6,176 @@
     <title>心愿之树 · 每一片叶子都有故事</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-
     <style>
-        :root {
-            --sky-top: #0a1628;
-            --sky-mid: #1a3a5c;
-            --sky-bottom: #2d5a3f;
-            --ground: #1a3320;
-            --gold: #f0c850;
-            --gold-dim: #c8a030;
-            --bark-dark: #3d2410;
-            --bark-mid: #5c3a1e;
-            --bark-light: #7a5230;
-            --leaf-shadow: rgba(0,0,0,0.3);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        html, body {
-            width: 100%;
-            min-height: 100vh;
-            overflow-x: hidden;
-            font-family: 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei', serif;
-        }
-
-        body {
-            background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 35%, var(--sky-bottom) 70%, var(--ground) 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        /* ===== Stars ===== */
-        .stars {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-        .star {
-            position: absolute;
-            width: 2px; height: 2px;
-            background: #fff;
-            border-radius: 50%;
-            animation: twinkle var(--dur) ease-in-out infinite alternate;
-        }
-        @keyframes twinkle {
-            0% { opacity: 0.15; transform: scale(0.8); }
-            100% { opacity: var(--brightness); transform: scale(1.2); }
-        }
-
-        /* ===== Fireflies ===== */
-        .firefly {
-            position: absolute;
-            width: 4px; height: 4px;
-            background: radial-gradient(circle, #ffe88a 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            animation: fireflyFloat var(--fly-dur) ease-in-out infinite alternate;
-            opacity: 0;
-        }
-        @keyframes fireflyFloat {
-            0% { opacity: 0; transform: translate(0, 0); }
-            25% { opacity: 0.9; }
-            50% { opacity: 0.4; transform: translate(var(--fx), var(--fy)); }
-            75% { opacity: 0.8; }
-            100% { opacity: 0; transform: translate(var(--fx2), var(--fy2)); }
-        }
-
-        /* ===== Main ===== */
-        .main-wrapper {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            max-width: 1100px;
-            padding: 20px 16px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        /* ===== Header ===== */
-        .page-header {
-            text-align: center;
-            margin-bottom: 20px;
-            animation: fadeSlideDown 1s ease-out;
-        }
-        .page-header h1 {
-            font-family: 'Ma Shan Zheng', cursive;
-            font-size: clamp(2rem, 7vw, 3.2rem);
-            color: var(--gold);
-            text-shadow: 0 0 30px rgba(240,200,80,0.3), 0 2px 4px rgba(0,0,0,0.5);
-            letter-spacing: 6px;
-        }
-        .page-header .subtitle {
-            font-size: clamp(0.75rem, 2.5vw, 0.95rem);
-            color: rgba(220,210,180,0.7);
-            margin-top: 6px;
-            letter-spacing: 3px;
-        }
-        .badges {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-        .leaf-count-badge, .sync-badge {
-            display: inline-block;
-            padding: 4px 18px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            backdrop-filter: blur(4px);
-        }
-        .leaf-count-badge {
-            background: rgba(240,200,80,0.15);
-            border: 1px solid rgba(240,200,80,0.3);
-            color: var(--gold);
-        }
-        .sync-badge {
-            background: rgba(100,200,120,0.15);
-            border: 1px solid rgba(100,200,120,0.3);
-            color: #8ad8a0;
-            font-size: 0.78rem;
-        }
-        .sync-badge.offline {
-            background: rgba(240,100,80,0.15);
-            border-color: rgba(240,100,80,0.3);
-            color: #e8a090;
-        }
-
-        @keyframes fadeSlideDown {
-            0% { opacity: 0; transform: translateY(-20px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ===== Tree Scene ===== */
-        .tree-scene {
-            position: relative;
-            width: 100%;
-            max-width: 900px;
-            aspect-ratio: 16 / 11;
-            min-height: 400px;
-            border-radius: 24px;
-            overflow: hidden;
-            background: radial-gradient(ellipse at 50% 80%, #1a3a20 0%, #0d1f12 60%, #060e08 100%);
-            box-shadow:
-                0 0 60px rgba(0,0,0,0.5),
-                inset 0 0 80px rgba(0,0,0,0.4),
-                0 0 120px rgba(30,80,40,0.1);
-            margin-bottom: 24px;
-        }
-        .ground {
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            height: 14%;
-            background: linear-gradient(180deg, #1a3a20 0%, #12291a 40%, #0d1f12 100%);
-            z-index: 2;
-        }
-        .ground::before {
-            content: '';
-            position: absolute;
-            top: -8px; left: 0; right: 0;
-            height: 16px;
-            background: repeating-conic-gradient(#2a5530 0% 25%, transparent 0% 50%) 0 0 / 20px 16px;
-            opacity: 0.5;
-        }
-        .ground-glow {
-            position: absolute;
-            bottom: 8%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60%;
-            height: 60px;
-            background: radial-gradient(ellipse, rgba(100,180,80,0.08) 0%, transparent 70%);
-            z-index: 1;
-            pointer-events: none;
-        }
-        .moon {
-            position: absolute;
-            top: 8%; right: 12%;
-            width: clamp(40px, 8vw, 70px);
-            height: clamp(40px, 8vw, 70px);
-            background: radial-gradient(circle at 35% 35%, #fffde8, #f5e6a0);
-            border-radius: 50%;
-            box-shadow: 0 0 40px 15px rgba(255,250,200,0.15), 0 0 80px 30px rgba(255,250,200,0.06);
-            z-index: 1;
-        }
-        .moon::after {
-            content: '';
-            position: absolute;
-            top: 18%; left: 22%;
-            width: 20%; height: 20%;
-            background: rgba(200,180,120,0.3);
-            border-radius: 50%;
-        }
-
-        /* ===== SVG Tree ===== */
-        .tree-svg-container {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 3;
-            pointer-events: none;
-        }
-        .tree-svg-container svg {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* ===== Leaves ===== */
-        .leaves-container {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 4;
-            pointer-events: none;
-        }
-        .tree-leaf {
-            position: absolute;
-            pointer-events: all;
-            cursor: pointer;
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s;
-            animation: leafGrow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-            transform-origin: center bottom;
-            z-index: 5;
-        }
-        .tree-leaf:hover {
-            transform: scale(1.3) !important;
-            filter: brightness(1.25) drop-shadow(0 0 10px rgba(200,255,100,0.5));
-            z-index: 10;
-        }
-        .tree-leaf svg {
-            width: 100%;
-            height: 100%;
-            filter: drop-shadow(1px 2px 3px var(--leaf-shadow));
-        }
-        @keyframes leafGrow {
-            0% { transform: scale(0) rotate(-20deg); opacity: 0; }
-            60% { transform: scale(1.15) rotate(3deg); opacity: 1; }
-            100% { transform: scale(1) rotate(var(--leaf-rot, 0deg)); opacity: 1; }
-        }
-        .tree-leaf.sway {
-            animation: leafGrow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-                       leafSway var(--sway-dur, 4s) ease-in-out var(--sway-delay, 0s) infinite alternate;
-        }
-        @keyframes leafSway {
-            0% { transform: scale(1) rotate(calc(var(--leaf-rot, 0deg) - 3deg)); }
-            100% { transform: scale(1) rotate(calc(var(--leaf-rot, 0deg) + 3deg)); }
-        }
-        .tree-leaf.flash::after {
-            content: '';
-            position: absolute;
-            top: -4px; left: -4px; right: -4px; bottom: -4px;
-            border-radius: 50%;
-            animation: newLeafFlash 0.8s ease-out forwards;
-        }
-        @keyframes newLeafFlash {
-            0% { box-shadow: 0 0 0 0 rgba(200,255,100,0.6); }
-            50% { box-shadow: 0 0 20px 8px rgba(200,255,100,0.3); }
-            100% { box-shadow: 0 0 0 0 rgba(200,255,100,0); }
-        }
-
-        /* ===== Popup ===== */
-        .leaf-popup-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(5,15,8,0.7);
-            backdrop-filter: blur(6px);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.35s;
-        }
-        .leaf-popup-overlay.visible {
-            opacity: 1;
-            pointer-events: all;
-        }
-        .leaf-popup {
-            background: linear-gradient(135deg, #f4f0e0 0%, #e8dfc8 100%);
-            border-radius: 24px;
-            padding: 36px 40px;
-            max-width: 480px;
-            width: 90%;
-            text-align: center;
-            transform: scale(0.85) translateY(20px);
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,180,120,0.3);
-            position: relative;
-        }
-        .leaf-popup-overlay.visible .leaf-popup {
-            transform: scale(1) translateY(0);
-        }
-        .leaf-popup .popup-leaf-icon {
-            font-size: 3rem;
-            margin-bottom: 12px;
-            display: block;
-        }
-        .leaf-popup .popup-text {
-            font-family: 'Ma Shan Zheng', cursive;
-            font-size: clamp(1.4rem, 5vw, 2rem);
-            color: #2a4a20;
-            line-height: 1.6;
-            word-break: break-word;
-        }
-        .leaf-popup .popup-time {
-            margin-top: 14px;
-            font-size: 0.8rem;
-            color: #8a7a5a;
-        }
-        .leaf-popup .popup-close {
-            position: absolute;
-            top: 12px; right: 16px;
-            background: none;
-            border: none;
-            font-size: 1.4rem;
-            color: #9a8a6a;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 8px;
-            box-shadow: none;
-        }
-        .leaf-popup .popup-close:hover {
-            color: #5a4a2a;
-        }
-
-        /* ===== Input ===== */
-        .input-area {
-            width: 100%;
-            max-width: 700px;
-            margin-bottom: 30px;
-            animation: fadeSlideDown 1s ease-out 0.3s both;
-        }
-        .input-card {
-            background: rgba(255,250,230,0.08);
-            border: 1px solid rgba(240,200,80,0.15);
-            backdrop-filter: blur(12px);
-            border-radius: 20px;
-            padding: 24px 28px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .input-label {
-            font-family: 'Ma Shan Zheng', cursive;
-            font-size: 1.2rem;
-            color: var(--gold-dim);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .input-row {
-            display: flex;
-            gap: 12px;
-            align-items: stretch;
-        }
-        .input-row input {
-            flex: 1;
-            padding: 14px 22px;
-            border-radius: 14px;
-            border: 1px solid rgba(240,200,80,0.2);
-            background: rgba(255,255,255,0.06);
-            color: #f0e8d0;
-            font-size: 1rem;
-            font-family: 'Noto Serif SC', serif;
-            outline: none;
-            transition: all 0.3s;
-            -webkit-appearance: none;
-        }
-        .input-row input::placeholder {
-            color: rgba(200,190,160,0.4);
-        }
-        .input-row input:focus {
-            border-color: var(--gold);
-            background: rgba(255,255,255,0.1);
-            box-shadow: 0 0 20px rgba(240,200,80,0.1);
-        }
-        .btn-send {
-            padding: 14px 28px;
-            border-radius: 14px;
-            border: none;
-            background: linear-gradient(135deg, #4a8a30, #3a6a24);
-            color: #e8f0d0;
-            font-family: 'Ma Shan Zheng', cursive;
-            font-size: 1.15rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(60,120,40,0.3);
-            white-space: nowrap;
-            letter-spacing: 2px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-send:hover {
-            background: linear-gradient(135deg, #5a9a3a, #4a7a2e);
-            box-shadow: 0 4px 20px rgba(60,120,40,0.5);
-            transform: translateY(-1px);
-        }
-        .btn-send:active { transform: scale(0.97); }
-        .action-btns {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .btn-secondary {
-            padding: 10px 20px;
-            border-radius: 12px;
-            border: 1px solid rgba(240,200,80,0.2);
-            background: rgba(255,255,255,0.04);
-            color: rgba(220,210,180,0.7);
-            font-family: 'Noto Serif SC', serif;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: none;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-secondary:hover {
-            background: rgba(255,255,255,0.08);
-            border-color: rgba(240,200,80,0.4);
-            color: var(--gold-dim);
-        }
-        .status-text {
-            font-size: 0.8rem;
-            color: rgba(180,170,140,0.6);
-            text-align: center;
-            margin-top: 4px;
-            min-height: 1.2em;
-            transition: color 0.3s;
-        }
-        .page-footer {
-            text-align: center;
-            padding: 20px;
-            color: rgba(150,140,110,0.4);
-            font-size: 0.75rem;
-            letter-spacing: 2px;
-        }
-
-        /* Particles */
-        .particle {
-            position: absolute;
-            width: 4px; height: 4px;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 20;
-        }
-        @keyframes particleBurst {
-            0% { opacity: 1; transform: translate(0,0) scale(1); }
-            100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0); }
-        }
-
-        /* ===== Config modal ===== */
-        .config-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(5,15,8,0.85);
-            backdrop-filter: blur(8px);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .config-overlay.hidden { display: none; }
-        .config-modal {
-            background: linear-gradient(135deg, #1a2a1a, #0f1f0f);
-            border: 1px solid rgba(240,200,80,0.2);
-            border-radius: 24px;
-            padding: 36px 32px;
-            max-width: 560px;
-            width: 100%;
-            color: #d8d0b8;
-        }
-        .config-modal h2 {
-            font-family: 'Ma Shan Zheng', cursive;
-            color: var(--gold);
-            font-size: 1.6rem;
-            margin-bottom: 8px;
-        }
-        .config-modal p {
-            font-size: 0.85rem;
-            line-height: 1.7;
-            margin-bottom: 16px;
-            color: rgba(200,190,160,0.8);
-        }
-        .config-modal label {
-            display: block;
-            font-size: 0.8rem;
-            color: var(--gold-dim);
-            margin-bottom: 6px;
-            margin-top: 12px;
-        }
-        .config-modal input {
-            width: 100%;
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 1px solid rgba(240,200,80,0.2);
-            background: rgba(255,255,255,0.06);
-            color: #f0e8d0;
-            font-size: 0.9rem;
-            font-family: monospace;
-            outline: none;
-        }
-        .config-modal input:focus {
-            border-color: var(--gold);
-        }
-        .config-modal .config-btns {
-            margin-top: 24px;
-            display: flex;
-            gap: 12px;
-        }
-        .config-modal .btn-primary {
-            padding: 12px 28px;
-            border-radius: 12px;
-            border: none;
-            background: linear-gradient(135deg, #4a8a30, #3a6a24);
-            color: #e8f0d0;
-            font-size: 1rem;
-            cursor: pointer;
-            font-family: 'Ma Shan Zheng', cursive;
-            letter-spacing: 2px;
-            box-shadow: none;
-        }
-        .config-modal .btn-skip {
-            padding: 12px 20px;
-            border-radius: 12px;
-            border: 1px solid rgba(240,200,80,0.2);
-            background: transparent;
-            color: rgba(200,190,160,0.7);
-            font-size: 0.85rem;
-            cursor: pointer;
-            font-family: 'Noto Serif SC', serif;
-            box-shadow: none;
-        }
-        .config-modal .hint {
-            font-size: 0.75rem;
-            color: rgba(160,150,120,0.5);
-            margin-top: 4px;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .tree-scene {
-                aspect-ratio: 4 / 3.5;
-                border-radius: 18px;
-                min-height: 350px;
-            }
-            .input-row { flex-direction: column; }
-            .btn-send { justify-content: center; }
-            .input-card { padding: 18px 20px; }
-        }
-        @media (max-width: 480px) {
-            .main-wrapper { padding: 12px 10px; }
-            .tree-scene { min-height: 300px; border-radius: 14px; }
-            .page-header h1 { letter-spacing: 3px; }
-        }
+        :root{--sky-top:#050e1a;--sky-mid:#0f2840;--sky-bottom:#1a3a28;--ground:#0e1f14;--gold:#f0c850;--gold-dim:#c8a030;--leaf-shadow:rgba(0,0,0,0.35)}
+        *{margin:0;padding:0;box-sizing:border-box}
+        html,body{width:100%;min-height:100vh;overflow-x:hidden;font-family:'Noto Serif SC','PingFang SC','Microsoft YaHei',serif}
+        body{background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 30%,var(--sky-bottom) 65%,var(--ground) 100%);display:flex;flex-direction:column;align-items:center}
+        .aurora{position:fixed;top:0;left:0;right:0;height:55vh;pointer-events:none;z-index:0;overflow:hidden;opacity:.35}
+        .aurora-band{position:absolute;width:200%;height:100%;background:linear-gradient(90deg,transparent 0%,rgba(40,200,120,.08) 15%,rgba(60,180,200,.12) 30%,rgba(100,220,150,.06) 45%,transparent 55%,rgba(80,160,220,.1) 70%,rgba(50,200,100,.08) 85%,transparent 100%);animation:auroraFlow var(--a-dur) ease-in-out infinite alternate;filter:blur(40px)}
+        @keyframes auroraFlow{0%{transform:translateX(-25%) skewX(-5deg) scaleY(.8)}50%{transform:translateX(-10%) skewX(3deg) scaleY(1.2)}100%{transform:translateX(-30%) skewX(-8deg) scaleY(.9)}}
+        .stars{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:0;overflow:hidden}
+        .star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--dur) ease-in-out infinite alternate}
+        @keyframes twinkle{0%{opacity:.1;transform:scale(.7)}100%{opacity:var(--brightness);transform:scale(1.3)}}
+        .shooting-star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;pointer-events:none;opacity:0;animation:shoot var(--shoot-dur) linear infinite}
+        .shooting-star::after{content:'';position:absolute;top:0;right:100%;width:60px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6))}
+        @keyframes shoot{0%{opacity:0;transform:translate(0,0) rotate(var(--shoot-angle))}5%{opacity:1}15%{opacity:1;transform:translate(var(--shoot-x),var(--shoot-y)) rotate(var(--shoot-angle))}20%{opacity:0;transform:translate(var(--shoot-x),var(--shoot-y)) rotate(var(--shoot-angle))}100%{opacity:0}}
+        .firefly{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,232,138,.9) 0%,rgba(255,232,138,.3) 40%,transparent 70%);animation:fireflyFloat var(--fly-dur) ease-in-out infinite alternate;opacity:0;box-shadow:0 0 6px 2px rgba(255,230,100,.3)}
+        @keyframes fireflyFloat{0%{opacity:0;transform:translate(0,0)}20%{opacity:.85}50%{opacity:.3;transform:translate(var(--fx),var(--fy))}80%{opacity:.9}100%{opacity:0;transform:translate(var(--fx2),var(--fy2))}}
+        .petal{position:absolute;pointer-events:none;opacity:0;animation:petalFall var(--petal-dur) linear infinite}
+        @keyframes petalFall{0%{opacity:0;transform:translate(0,0) rotate(0deg) scale(.8)}10%{opacity:.5}90%{opacity:.3}100%{opacity:0;transform:translate(var(--petal-x),var(--petal-y)) rotate(var(--petal-rot)) scale(.3)}}
+        .main-wrapper{position:relative;z-index:1;width:100%;max-width:1400px;padding:16px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+        .page-header{text-align:center;margin-bottom:16px;animation:fadeSlideDown 1s ease-out}
+        .page-header h1{font-family:'Ma Shan Zheng',cursive;font-size:clamp(1.8rem,6vw,3rem);color:var(--gold);text-shadow:0 0 40px rgba(240,200,80,.25),0 2px 4px rgba(0,0,0,.6);letter-spacing:8px}
+        .page-header .subtitle{font-size:clamp(.7rem,2vw,.9rem);color:rgba(220,210,180,.5);margin-top:4px;letter-spacing:4px}
+        .badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+        .leaf-count-badge,.sync-badge{display:inline-block;padding:3px 16px;border-radius:20px;font-size:.8rem;backdrop-filter:blur(4px)}
+        .leaf-count-badge{background:rgba(240,200,80,.12);border:1px solid rgba(240,200,80,.25);color:var(--gold)}
+        .sync-badge{background:rgba(100,200,120,.12);border:1px solid rgba(100,200,120,.25);color:#8ad8a0;font-size:.75rem}
+        .sync-badge.offline{background:rgba(240,100,80,.12);border-color:rgba(240,100,80,.25);color:#e8a090}
+        .sync-badge.connecting{background:rgba(240,200,80,.12);border-color:rgba(240,200,80,.25);color:#e8d080}
+        @keyframes fadeSlideDown{0%{opacity:0;transform:translateY(-20px)}100%{opacity:1;transform:translateY(0)}}
+        .content-area{display:flex;gap:20px;width:100%;max-width:1300px;align-items:stretch;margin-bottom:20px}
+        .tree-scene{position:relative;flex:1;min-width:0;aspect-ratio:16/11;min-height:400px;border-radius:20px;overflow:hidden;background:radial-gradient(ellipse at 50% 85%,#142e18 0%,#0a1a0e 55%,#050e08 100%);box-shadow:0 0 60px rgba(0,0,0,.5),inset 0 0 100px rgba(0,0,0,.5),0 0 1px rgba(100,200,80,.2)}
+        .ground{position:absolute;bottom:0;left:0;right:0;height:13%;background:linear-gradient(180deg,#162e1a 0%,#0e1f12 50%,#091408 100%);z-index:2}
+        .ground::before{content:'';position:absolute;top:-10px;left:0;right:0;height:20px;background:repeating-linear-gradient(85deg,transparent 0px,transparent 8px,#1e4422 8px,transparent 9px),repeating-linear-gradient(95deg,transparent 0px,transparent 12px,#1a3a1e 12px,transparent 13px),repeating-linear-gradient(88deg,transparent 0px,transparent 6px,#224a28 6px,transparent 7px);opacity:.6}
+        .ground-glow{position:absolute;bottom:6%;left:50%;transform:translateX(-50%);width:50%;height:80px;background:radial-gradient(ellipse,rgba(80,160,60,.06) 0%,transparent 70%);z-index:1;pointer-events:none}
+        .moon{position:absolute;top:6%;right:10%;width:clamp(45px,9vw,80px);height:clamp(45px,9vw,80px);background:radial-gradient(circle at 30% 30%,#fffef0,#f8eda0,#e8d888);border-radius:50%;box-shadow:0 0 50px 20px rgba(255,250,200,.1),0 0 100px 40px rgba(255,250,200,.04);z-index:1}
+        .moon::before{content:'';position:absolute;top:20%;left:25%;width:18%;height:18%;background:rgba(200,180,100,.25);border-radius:50%}
+        .moon::after{content:'';position:absolute;top:50%;left:55%;width:12%;height:12%;background:rgba(180,160,90,.2);border-radius:50%}
+        .tree-svg-container{position:absolute;top:0;left:0;right:0;bottom:0;z-index:3;pointer-events:none}
+        .tree-svg-container svg{width:100%;height:100%}
+        .canopy-glow{position:absolute;top:5%;left:50%;transform:translateX(-50%);width:70%;height:50%;background:radial-gradient(ellipse,rgba(60,140,40,.06) 0%,transparent 60%);z-index:2;pointer-events:none;animation:canopyPulse 6s ease-in-out infinite alternate}
+        @keyframes canopyPulse{0%{opacity:.5}100%{opacity:1}}
+        .leaves-container{position:absolute;top:0;left:0;right:0;bottom:0;z-index:4;pointer-events:none}
+        .tree-leaf{position:absolute;pointer-events:all;cursor:pointer;transition:transform .3s cubic-bezier(.34,1.56,.64,1),filter .3s;animation:leafGrow .7s cubic-bezier(.34,1.56,.64,1) forwards;transform-origin:center bottom;z-index:5}
+        .tree-leaf:hover{transform:scale(1.4)!important;filter:brightness(1.3) drop-shadow(0 0 12px rgba(180,255,80,.6));z-index:10}
+        .tree-leaf svg{width:100%;height:100%;filter:drop-shadow(1px 2px 4px var(--leaf-shadow))}
+        @keyframes leafGrow{0%{transform:scale(0) rotate(-30deg);opacity:0}50%{transform:scale(1.2) rotate(5deg);opacity:1}75%{transform:scale(.95) rotate(-2deg)}100%{transform:scale(1) rotate(var(--leaf-rot,0deg));opacity:1}}
+        .tree-leaf.sway{animation:leafGrow .7s cubic-bezier(.34,1.56,.64,1) forwards,leafSway var(--sway-dur,4s) ease-in-out var(--sway-delay,0s) infinite alternate}
+        @keyframes leafSway{0%{transform:scale(1) rotate(calc(var(--leaf-rot,0deg) - 4deg))}100%{transform:scale(1) rotate(calc(var(--leaf-rot,0deg) + 4deg))}}
+        .tree-leaf.flash::after{content:'';position:absolute;top:-6px;left:-6px;right:-6px;bottom:-6px;border-radius:50%;animation:newLeafFlash 1s ease-out forwards}
+        @keyframes newLeafFlash{0%{box-shadow:0 0 0 0 rgba(180,255,80,.7)}40%{box-shadow:0 0 25px 10px rgba(180,255,80,.35)}100%{box-shadow:0 0 0 0 rgba(180,255,80,0)}}
+        .leaf-sidebar{width:280px;flex-shrink:0;background:rgba(10,20,12,.6);border:1px solid rgba(100,180,80,.12);border-radius:20px;backdrop-filter:blur(16px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,.3),inset 0 0 30px rgba(0,0,0,.2)}
+        .sidebar-header{padding:18px 20px 14px;border-bottom:1px solid rgba(100,180,80,.1);display:flex;align-items:center;gap:10px}
+        .sidebar-header h2{font-family:'Ma Shan Zheng',cursive;font-size:1.15rem;color:var(--gold-dim);letter-spacing:3px}
+        .sidebar-header .sidebar-icon{width:28px;height:28px;background:rgba(100,200,80,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+        .sidebar-scroll{flex:1;overflow:hidden;position:relative;min-height:200px}
+        .sidebar-track{position:absolute;top:0;left:0;right:0;animation:sidebarScroll var(--scroll-dur,30s) linear infinite}
+        @keyframes sidebarScroll{0%{transform:translateY(0)}100%{transform:translateY(-50%)}}
+        .sidebar-track:hover{animation-play-state:paused}
+        .sidebar-item{padding:14px 20px;border-bottom:1px solid rgba(100,180,80,.06);transition:background .3s;cursor:pointer}
+        .sidebar-item:hover{background:rgba(100,200,80,.08)}
+        .sidebar-item-text{font-size:.88rem;color:rgba(210,230,200,.85);line-height:1.55;word-break:break-word}
+        .sidebar-item-time{font-size:.68rem;color:rgba(150,170,130,.4);margin-top:6px}
+        .sidebar-item-index{display:inline-block;width:20px;height:20px;background:rgba(100,180,80,.12);border-radius:6px;text-align:center;line-height:20px;font-size:.65rem;color:rgba(160,210,140,.6);margin-right:8px;font-weight:bold;vertical-align:middle}
+        .sidebar-empty{padding:40px 20px;text-align:center;color:rgba(150,170,130,.3);font-size:.85rem;font-style:italic}
+        .sidebar-footer{padding:10px 16px;border-top:1px solid rgba(100,180,80,.08);text-align:center;font-size:.7rem;color:rgba(140,160,120,.3)}
+        .leaf-popup-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(3,10,5,.75);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .35s}
+        .leaf-popup-overlay.visible{opacity:1;pointer-events:all}
+        .leaf-popup{background:linear-gradient(145deg,#f6f2e4 0%,#ece4cc 100%);border-radius:24px;padding:40px 44px;max-width:500px;width:90%;text-align:center;transform:scale(.8) translateY(30px);transition:transform .45s cubic-bezier(.34,1.56,.64,1);box-shadow:0 25px 80px rgba(0,0,0,.5),0 0 0 1px rgba(200,180,120,.2);position:relative}
+        .leaf-popup-overlay.visible .leaf-popup{transform:scale(1) translateY(0)}
+        .popup-leaf-icon{font-size:2.5rem;margin-bottom:10px;display:block}
+        .popup-text{font-family:'Ma Shan Zheng',cursive;font-size:clamp(1.5rem,5vw,2.2rem);color:#2a4a1e;line-height:1.6;word-break:break-word}
+        .popup-time{margin-top:16px;font-size:.78rem;color:#9a8a60}
+        .popup-close{position:absolute;top:14px;right:18px;background:none;border:none;font-size:1.3rem;color:#a09070;cursor:pointer;padding:4px 8px;border-radius:8px;box-shadow:none}
+        .input-area{width:100%;max-width:800px;margin-bottom:24px;animation:fadeSlideDown 1s ease-out .3s both}
+        .input-card{background:rgba(255,250,230,.06);border:1px solid rgba(240,200,80,.12);backdrop-filter:blur(16px);border-radius:18px;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+        .input-label{font-family:'Ma Shan Zheng',cursive;font-size:1.15rem;color:var(--gold-dim);display:flex;align-items:center;gap:8px}
+        .input-row{display:flex;gap:12px;align-items:stretch}
+        .input-row input{flex:1;padding:13px 20px;border-radius:14px;border:1px solid rgba(240,200,80,.18);background:rgba(255,255,255,.05);color:#f0e8d0;font-size:1rem;font-family:'Noto Serif SC',serif;outline:none;transition:all .3s;-webkit-appearance:none}
+        .input-row input::placeholder{color:rgba(200,190,160,.35)}
+        .input-row input:focus{border-color:var(--gold);background:rgba(255,255,255,.09);box-shadow:0 0 25px rgba(240,200,80,.08)}
+        .btn-send{padding:13px 26px;border-radius:14px;border:none;background:linear-gradient(135deg,#4a8a30,#3a6a24);color:#e8f0d0;font-family:'Ma Shan Zheng',cursive;font-size:1.1rem;cursor:pointer;transition:all .3s;box-shadow:0 4px 15px rgba(60,120,40,.3);white-space:nowrap;letter-spacing:2px;display:flex;align-items:center;gap:6px}
+        .btn-send:hover{background:linear-gradient(135deg,#5a9a3a,#4a7a2e);box-shadow:0 4px 25px rgba(60,120,40,.5);transform:translateY(-1px)}
+        .btn-send:active{transform:scale(.97)}
+        .action-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+        .btn-secondary{padding:9px 18px;border-radius:12px;border:1px solid rgba(240,200,80,.15);background:rgba(255,255,255,.03);color:rgba(220,210,180,.6);font-family:'Noto Serif SC',serif;font-size:.82rem;cursor:pointer;transition:all .3s;box-shadow:none;display:flex;align-items:center;gap:6px}
+        .btn-secondary:hover{background:rgba(255,255,255,.07);border-color:rgba(240,200,80,.35);color:var(--gold-dim)}
+        .status-text{font-size:.78rem;color:rgba(180,170,140,.5);text-align:center;min-height:1.2em;flex:1}
+        .page-footer{text-align:center;padding:16px;color:rgba(130,120,90,.3);font-size:.7rem;letter-spacing:3px}
+        .particle{position:absolute;border-radius:50%;pointer-events:none;z-index:20}
+        @keyframes particleBurst{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(0)}}
+        @media(max-width:900px){.content-area{flex-direction:column}.leaf-sidebar{width:100%;max-height:220px}.sidebar-scroll{min-height:120px}.tree-scene{aspect-ratio:4/3;min-height:350px}}
+        @media(max-width:600px){.main-wrapper{padding:10px 8px}.tree-scene{min-height:280px;border-radius:14px}.page-header h1{letter-spacing:4px}.input-row{flex-direction:column}.btn-send{justify-content:center}.input-card{padding:16px 18px}.leaf-sidebar{max-height:180px;border-radius:14px}}
     </style>
 </head>
 <body>
-
+<div class="aurora"><div class="aurora-band" style="top:0;--a-dur:18s;opacity:.7"></div><div class="aurora-band" style="top:15%;--a-dur:24s;opacity:.5;animation-delay:-6s"></div><div class="aurora-band" style="top:5%;--a-dur:30s;opacity:.3;animation-delay:-12s"></div></div>
 <div class="stars" id="starsContainer"></div>
-
 <div class="main-wrapper">
     <header class="page-header">
-        <h1>心愿之树</h1>
+        <h1>心 愿 之 树</h1>
         <div class="subtitle">每一片叶子，都承载一份心声</div>
-        <div class="badges">
-            <div class="leaf-count-badge" id="leafBadge">🍃 0 片树叶</div>
-            <div class="sync-badge" id="syncBadge">⏳ 连接中…</div>
-        </div>
+        <div class="badges"><div class="leaf-count-badge" id="leafBadge">🍃 0 片树叶</div><div class="sync-badge connecting" id="syncBadge">⏳ 连接中…</div></div>
     </header>
-
-    <div class="tree-scene" id="treeScene">
-        <div class="moon"></div>
-        <div class="ground"></div>
-        <div class="ground-glow"></div>
-
-        <div class="tree-svg-container">
-            <svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <linearGradient id="barkGrad" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stop-color="#3d2410"/>
-                        <stop offset="30%" stop-color="#5c3a1e"/>
-                        <stop offset="50%" stop-color="#6a4828"/>
-                        <stop offset="70%" stop-color="#5c3a1e"/>
-                        <stop offset="100%" stop-color="#3d2410"/>
-                    </linearGradient>
-                    <linearGradient id="barkGrad2" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stop-color="#4a2e16"/>
-                        <stop offset="50%" stop-color="#6b4428"/>
-                        <stop offset="100%" stop-color="#4a2e16"/>
-                    </linearGradient>
-                </defs>
-                <g opacity="0.6">
-                    <path d="M410 545 Q380 560, 340 555 Q310 558, 290 565" stroke="#3d2410" stroke-width="8" fill="none" stroke-linecap="round"/>
-                    <path d="M490 545 Q520 558, 560 552 Q590 558, 620 565" stroke="#3d2410" stroke-width="7" fill="none" stroke-linecap="round"/>
-                    <path d="M430 550 Q410 565, 370 570" stroke="#3d2410" stroke-width="5" fill="none" stroke-linecap="round"/>
-                    <path d="M470 548 Q495 565, 540 568" stroke="#3d2410" stroke-width="5" fill="none" stroke-linecap="round"/>
-                </g>
-                <path d="M420 545 Q415 480, 425 420 Q430 360, 440 310 Q445 270, 450 240" stroke="url(#barkGrad)" stroke-width="42" fill="none" stroke-linecap="round"/>
-                <path d="M480 545 Q485 480, 475 420 Q470 360, 460 310 Q455 270, 450 240" stroke="url(#barkGrad)" stroke-width="38" fill="none" stroke-linecap="round"/>
-                <path d="M445 540 Q440 460, 448 380 Q452 310, 450 245" stroke="#7a5a35" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.4"/>
-                <g stroke="#2e1a08" opacity="0.3" fill="none" stroke-width="1">
-                    <path d="M430 530 Q435 500, 432 470"/>
-                    <path d="M465 530 Q462 495, 466 460"/>
-                    <path d="M440 450 Q443 420, 440 390"/>
-                    <path d="M460 440 Q457 410, 460 380"/>
-                    <path d="M445 370 Q448 340, 446 310"/>
-                    <path d="M455 360 Q452 330, 455 300"/>
-                </g>
-                <g stroke-linecap="round" fill="none">
-                    <path d="M445 300 Q400 270, 340 240 Q290 215, 240 195" stroke="url(#barkGrad2)" stroke-width="18"/>
-                    <path d="M340 240 Q310 220, 270 230 Q230 238, 195 220" stroke="#4a2e16" stroke-width="10"/>
-                    <path d="M290 215 Q260 195, 220 175" stroke="#4a2e16" stroke-width="8"/>
-                    <path d="M240 195 Q210 175, 170 160" stroke="#4a2e16" stroke-width="7"/>
-                    <path d="M340 240 Q320 260, 280 270" stroke="#4a2e16" stroke-width="7"/>
-                    <path d="M455 290 Q510 260, 570 235 Q620 215, 670 200" stroke="url(#barkGrad2)" stroke-width="16"/>
-                    <path d="M570 235 Q610 220, 640 245 Q665 260, 700 250" stroke="#4a2e16" stroke-width="9"/>
-                    <path d="M620 215 Q660 195, 700 180" stroke="#4a2e16" stroke-width="7"/>
-                    <path d="M670 200 Q700 185, 730 175" stroke="#4a2e16" stroke-width="6"/>
-                    <path d="M570 235 Q585 260, 610 275" stroke="#4a2e16" stroke-width="6"/>
-                    <path d="M450 260 Q448 220, 445 180 Q442 150, 440 120" stroke="url(#barkGrad2)" stroke-width="14"/>
-                    <path d="M445 180 Q425 155, 400 135" stroke="#4a2e16" stroke-width="8"/>
-                    <path d="M445 180 Q465 150, 490 130" stroke="#4a2e16" stroke-width="7"/>
-                    <path d="M440 120 Q430 100, 420 80" stroke="#4a2e16" stroke-width="6"/>
-                    <path d="M440 120 Q455 95, 465 75" stroke="#4a2e16" stroke-width="5"/>
-                    <path d="M440 260 Q395 230, 350 190 Q320 168, 290 145" stroke="#4a2e16" stroke-width="11"/>
-                    <path d="M350 190 Q325 175, 300 185" stroke="#4a2e16" stroke-width="6"/>
-                    <path d="M290 145 Q265 128, 240 120" stroke="#4a2e16" stroke-width="5"/>
-                    <path d="M458 255 Q500 225, 550 195 Q585 175, 620 155" stroke="#4a2e16" stroke-width="10"/>
-                    <path d="M550 195 Q575 180, 590 200" stroke="#4a2e16" stroke-width="6"/>
-                    <path d="M620 155 Q645 140, 665 130" stroke="#4a2e16" stroke-width="5"/>
-                    <path d="M435 350 Q390 340, 350 310" stroke="#4a2e16" stroke-width="9"/>
-                    <path d="M465 345 Q510 330, 555 315" stroke="#4a2e16" stroke-width="8"/>
-                    <path d="M350 310 Q320 295, 295 310" stroke="#4a2e16" stroke-width="5"/>
-                    <path d="M555 315 Q580 305, 610 315" stroke="#4a2e16" stroke-width="5"/>
-                </g>
-                <g fill="#5c3a1e">
-                    <circle cx="170" cy="160" r="5"/><circle cx="195" cy="220" r="4.5"/>
-                    <circle cx="220" cy="175" r="4"/><circle cx="240" cy="120" r="4"/>
-                    <circle cx="280" cy="270" r="4"/><circle cx="295" cy="310" r="4"/>
-                    <circle cx="300" cy="185" r="3.5"/><circle cx="400" cy="135" r="4"/>
-                    <circle cx="420" cy="80" r="3.5"/><circle cx="465" cy="75" r="3.5"/>
-                    <circle cx="490" cy="130" r="4"/><circle cx="590" cy="200" r="3.5"/>
-                    <circle cx="610" cy="275" r="3.5"/><circle cx="610" cy="315" r="3.5"/>
-                    <circle cx="665" cy="130" r="4"/><circle cx="700" cy="180" r="4"/>
-                    <circle cx="700" cy="250" r="4.5"/><circle cx="730" cy="175" r="3.5"/>
-                </g>
-            </svg>
+    <div class="content-area">
+        <div class="tree-scene" id="treeScene">
+            <div class="moon"></div><div class="ground"></div><div class="ground-glow"></div><div class="canopy-glow"></div>
+            <div class="tree-svg-container">
+                <svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="barkGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2e1a08"/><stop offset="20%" stop-color="#4a2e16"/><stop offset="40%" stop-color="#5c3a1e"/><stop offset="50%" stop-color="#6a4828"/><stop offset="60%" stop-color="#5c3a1e"/><stop offset="80%" stop-color="#4a2e16"/><stop offset="100%" stop-color="#2e1a08"/></linearGradient>
+                        <linearGradient id="bG2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#3a2210"/><stop offset="50%" stop-color="#5a3820"/><stop offset="100%" stop-color="#3a2210"/></linearGradient>
+                        <filter id="barkTex"><feTurbulence type="fractalNoise" baseFrequency="0.04 0.15" numOctaves="4" seed="2" result="noise"/><feDiffuseLighting in="noise" lighting-color="#8a6a3a" surfaceScale="1.5" result="lit"><feDistantLight azimuth="225" elevation="45"/></feDiffuseLighting><feComposite in="lit" in2="SourceGraphic" operator="multiply"/></filter>
+                    </defs>
+                    <g opacity=".55" stroke-linecap="round" fill="none"><path d="M405 548 Q370 562,330 558 Q300 560,260 572" stroke="#3a2210" stroke-width="9"/><path d="M495 548 Q530 560,575 555 Q610 562,650 572" stroke="#3a2210" stroke-width="8"/><path d="M425 553 Q400 568,360 575" stroke="#3a2210" stroke-width="6"/><path d="M475 552 Q505 568,550 574" stroke="#3a2210" stroke-width="6"/><path d="M440 556 Q420 572,390 580" stroke="#3a2210" stroke-width="4"/><path d="M460 555 Q485 572,520 580" stroke="#3a2210" stroke-width="4"/></g>
+                    <g filter="url(#barkTex)"><path d="M415 548 Q408 470,420 400 Q428 340,438 290 Q443 258,448 230" stroke="url(#barkGrad)" stroke-width="46" fill="none" stroke-linecap="round"/><path d="M485 548 Q492 470,480 400 Q472 340,462 290 Q457 258,452 230" stroke="url(#barkGrad)" stroke-width="40" fill="none" stroke-linecap="round"/></g>
+                    <path d="M443 545 Q438 450,446 370 Q450 300,448 235" stroke="rgba(140,110,60,.2)" stroke-width="12" fill="none" stroke-linecap="round"/>
+                    <g stroke="#1e1008" opacity=".25" fill="none" stroke-width=".8"><path d="M428 535 Q432 500,429 465"/><path d="M468 535 Q464 498,467 460"/><path d="M435 445 Q439 410,436 375"/><path d="M462 440 Q458 408,461 375"/><path d="M442 360 Q446 330,443 295"/><path d="M457 355 Q453 325,456 295"/><path d="M448 280 Q450 260,448 240"/></g>
+                    <g stroke-linecap="round" fill="none"><path d="M442 295 Q395 265,335 235 Q285 210,235 190" stroke="url(#bG2)" stroke-width="20"/><path d="M335 235 Q305 215,265 225 Q225 233,190 215" stroke="#3a2210" stroke-width="11"/><path d="M285 210 Q255 190,215 170" stroke="#3a2210" stroke-width="9"/><path d="M235 190 Q205 170,165 155" stroke="#3a2210" stroke-width="7"/><path d="M335 235 Q315 255,275 268" stroke="#3a2210" stroke-width="7"/><path d="M215 170 Q195 158,175 165" stroke="#3a2210" stroke-width="5"/><path d="M458 285 Q515 255,575 230 Q625 210,675 195" stroke="url(#bG2)" stroke-width="18"/><path d="M575 230 Q615 215,645 240 Q670 255,705 245" stroke="#3a2210" stroke-width="10"/><path d="M625 210 Q665 190,705 175" stroke="#3a2210" stroke-width="8"/><path d="M675 195 Q705 180,735 170" stroke="#3a2210" stroke-width="6"/><path d="M575 230 Q590 255,615 272" stroke="#3a2210" stroke-width="6"/><path d="M705 175 Q725 165,740 170" stroke="#3a2210" stroke-width="4"/><path d="M450 255 Q448 215,445 175 Q442 145,438 115" stroke="url(#bG2)" stroke-width="15"/><path d="M445 175 Q422 148,395 130" stroke="#3a2210" stroke-width="9"/><path d="M445 175 Q468 145,495 125" stroke="#3a2210" stroke-width="8"/><path d="M438 115 Q428 95,415 75" stroke="#3a2210" stroke-width="6"/><path d="M438 115 Q452 90,462 70" stroke="#3a2210" stroke-width="5"/><path d="M438 115 Q435 95,438 80" stroke="#3a2210" stroke-width="4"/><path d="M438 255 Q390 225,345 185 Q315 163,285 140" stroke="#3a2210" stroke-width="12"/><path d="M345 185 Q320 170,295 180" stroke="#3a2210" stroke-width="6"/><path d="M285 140 Q260 123,235 115" stroke="#3a2210" stroke-width="5"/><path d="M460 250 Q505 220,555 190 Q590 170,625 150" stroke="#3a2210" stroke-width="11"/><path d="M555 190 Q580 175,595 195" stroke="#3a2210" stroke-width="6"/><path d="M625 150 Q650 135,670 125" stroke="#3a2210" stroke-width="5"/><path d="M432 345 Q385 335,345 305" stroke="#3a2210" stroke-width="10"/><path d="M468 340 Q515 325,560 310" stroke="#3a2210" stroke-width="9"/><path d="M345 305 Q315 290,290 305" stroke="#3a2210" stroke-width="5"/><path d="M560 310 Q585 300,615 310" stroke="#3a2210" stroke-width="5"/></g>
+                    <g fill="#4a3018" opacity=".7"><circle cx="165" cy="155" r="5.5"/><circle cx="175" cy="165" r="3"/><circle cx="190" cy="215" r="5"/><circle cx="215" cy="170" r="4.5"/><circle cx="235" cy="115" r="4"/><circle cx="275" cy="268" r="4"/><circle cx="290" cy="305" r="4.5"/><circle cx="295" cy="180" r="3.5"/><circle cx="395" cy="130" r="4.5"/><circle cx="415" cy="75" r="4"/><circle cx="438" cy="80" r="3"/><circle cx="462" cy="70" r="3.5"/><circle cx="495" cy="125" r="4.5"/><circle cx="595" cy="195" r="4"/><circle cx="615" cy="272" r="4"/><circle cx="615" cy="310" r="4"/><circle cx="670" cy="125" r="4.5"/><circle cx="705" cy="175" r="4.5"/><circle cx="705" cy="245" r="5"/><circle cx="735" cy="170" r="4"/><circle cx="740" cy="170" r="3"/></g>
+                </svg>
+            </div>
+            <div class="leaves-container" id="leavesContainer"></div>
+            <div id="firefliesContainer"></div>
         </div>
-
-        <div class="leaves-container" id="leavesContainer"></div>
-        <div id="firefliesContainer"></div>
+        <div class="leaf-sidebar" id="leafSidebar">
+            <div class="sidebar-header"><div class="sidebar-icon">🍃</div><h2>叶片心语</h2></div>
+            <div class="sidebar-scroll" id="sidebarScroll"><div class="sidebar-empty" id="sidebarEmpty">还没有树叶，写下第一片吧…</div><div class="sidebar-track" id="sidebarTrack"></div></div>
+            <div class="sidebar-footer" id="sidebarFooter">自动循环滚动 · 悬停暂停</div>
+        </div>
     </div>
-
     <div class="input-area">
         <div class="input-card">
             <div class="input-label">🍃 写下一片树叶</div>
-            <div class="input-row">
-                <input type="text" id="textInput" placeholder="写下你的心声，让它长成一片叶子…" maxlength="80" autocomplete="off">
-                <button class="btn-send" id="sendBtn">🌿 添枝加叶</button>
-            </div>
-            <div class="action-btns">
-                <button class="btn-secondary" id="voiceBtn">🎙️ 语音输入</button>
-                <button class="btn-secondary" id="resetBtn">🍂 重置大树</button>
-                <button class="btn-secondary" id="configBtn">⚙️ 同步设置</button>
-            </div>
-            <div class="status-text" id="statusText">点击树叶可以查看完整内容</div>
+            <div class="input-row"><input type="text" id="textInput" placeholder="写下你的心声，让它长成一片叶子…" maxlength="80" autocomplete="off"><button class="btn-send" id="sendBtn">🌿 添枝加叶</button></div>
+            <div class="action-row"><button class="btn-secondary" id="resetBtn">🍂 重置大树</button><div class="status-text" id="statusText">点击树叶可以查看完整内容</div></div>
         </div>
     </div>
-
     <footer class="page-footer">心愿之树 · 每一片叶子都承载一份心声</footer>
 </div>
-
-<!-- Leaf popup -->
-<div class="leaf-popup-overlay" id="popupOverlay">
-    <div class="leaf-popup" id="popupCard">
-        <button class="popup-close" id="popupClose">✕</button>
-        <span class="popup-leaf-icon">🍀</span>
-        <div class="popup-text" id="popupText"></div>
-        <div class="popup-time" id="popupTime"></div>
-    </div>
-</div>
-
-<!-- Firebase config modal -->
-<div class="config-overlay hidden" id="configOverlay">
-    <div class="config-modal">
-        <h2>🔥 Firebase 同步配置</h2>
-        <p>填入你的 Firebase 配置信息，即可让所有设备看到同一棵树。<br>
-        在 <a href="https://console.firebase.google.com" target="_blank" style="color:var(--gold)">Firebase 控制台</a> → 项目设置 → 你的应用 中获取以下信息：</p>
-
-        <label>API Key</label>
-        <input type="text" id="cfgApiKey" placeholder="AIzaSy...">
-
-        <label>Auth Domain</label>
-        <input type="text" id="cfgAuthDomain" placeholder="your-project.firebaseapp.com">
-
-        <label>Database URL</label>
-        <input type="text" id="cfgDbUrl" placeholder="https://your-project-default-rtdb.firebaseio.com">
-        <div class="hint">⚠️ 必须填写，在 Realtime Database 页面顶部可以看到</div>
-
-        <label>Project ID</label>
-        <input type="text" id="cfgProjectId" placeholder="your-project-id">
-
-        <div class="config-btns">
-            <button class="btn-primary" id="cfgSaveBtn">✅ 保存并连接</button>
-            <button class="btn-skip" id="cfgSkipBtn">仅本地模式</button>
-        </div>
-    </div>
-</div>
-
+<div class="leaf-popup-overlay" id="popupOverlay"><div class="leaf-popup"><button class="popup-close" id="popupClose">✕</button><span class="popup-leaf-icon">🍀</span><div class="popup-text" id="popupText"></div><div class="popup-time" id="popupTime"></div></div></div>
 <script>
-(function() {
-    'use strict';
-
-    // ====== State ======
-    let leaves = [];
-    let firebaseReady = false;
-    let dbRef = null;
-    const CONFIG_KEY = 'wish_tree_firebase_config';
-    const LEAVES_KEY = 'wish_tree_leaves_v2';
-
-    // ====== DOM ======
-    const leavesContainer = document.getElementById('leavesContainer');
-    const textInput = document.getElementById('textInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const voiceBtn = document.getElementById('voiceBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const configBtn = document.getElementById('configBtn');
-    const statusText = document.getElementById('statusText');
-    const leafBadge = document.getElementById('leafBadge');
-    const syncBadge = document.getElementById('syncBadge');
-    const popupOverlay = document.getElementById('popupOverlay');
-    const popupClose = document.getElementById('popupClose');
-    const popupText = document.getElementById('popupText');
-    const popupTime = document.getElementById('popupTime');
-    const configOverlay = document.getElementById('configOverlay');
-    const treeScene = document.getElementById('treeScene');
-
-    // ====== Branch positions (%) ======
-    const branchTips = [
-        {x:18.8,y:25.8},{x:21.6,y:35.5},{x:24.4,y:28.2},{x:26.6,y:19.4},
-        {x:31.1,y:43.5},{x:32.8,y:50.0},{x:33.3,y:29.8},{x:32.2,y:23.4},
-        {x:44.4,y:21.8},{x:46.7,y:12.9},{x:51.6,y:12.1},{x:54.4,y:21.0},
-        {x:65.6,y:32.3},{x:67.8,y:44.4},{x:67.8,y:50.8},{x:73.9,y:21.0},
-        {x:77.8,y:29.0},{x:77.8,y:40.3},{x:81.1,y:28.2},
-        {x:22,y:31},{x:28,y:24},{x:35,y:26},{x:38,y:18},{x:42,y:16},
-        {x:48,y:15},{x:52,y:17},{x:56,y:22},{x:60,y:26},{x:65,y:24},
-        {x:70,y:28},{x:75,y:24},{x:30,y:36},{x:36,y:32},{x:40,y:28},
-        {x:50,y:20},{x:58,y:28},{x:62,y:35},{x:68,y:32},{x:72,y:36},
-        {x:25,y:38},{x:45,y:24},{x:55,y:25},{x:63,y:40},{x:34,y:44},
-    ];
-
-    const leafColors = [
-        {fill:'#5ca832',stroke:'#3d7a1c',vein:'#4a8a28'},
-        {fill:'#6db840',stroke:'#4a8a28',vein:'#5aa032'},
-        {fill:'#7ec850',stroke:'#5aa035',vein:'#6ab040'},
-        {fill:'#4a9628',stroke:'#357018',vein:'#408520'},
-        {fill:'#88d060',stroke:'#60a840',vein:'#70b848'},
-        {fill:'#9ad870',stroke:'#70b048',vein:'#80c058'},
-        {fill:'#78c048',stroke:'#58a030',vein:'#68b040'},
-        {fill:'#a0d880',stroke:'#78b858',vein:'#88c868'},
-        {fill:'#60b035',stroke:'#408820',vein:'#509828'},
-    ];
-
-    // ====== Leaf SVG ======
-    function createLeafSVG(color, size) {
-        const w = size, h = size * 1.4;
-        const ns = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(ns, 'svg');
-        svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-        svg.setAttribute('width', w);
-        svg.setAttribute('height', h);
-        svg.style.overflow = 'visible';
-
-        const cx = w/2, tipY = 2, baseY = h-3, midY = h*0.4, bulge = w*0.5;
-
-        const leaf = document.createElementNS(ns, 'path');
-        leaf.setAttribute('d', `
-            M ${cx} ${tipY}
-            C ${cx-bulge*0.3} ${tipY+h*0.1}, ${cx-bulge} ${midY-h*0.1}, ${cx-bulge*0.85} ${midY}
-            C ${cx-bulge*0.7} ${midY+h*0.15}, ${cx-bulge*0.3} ${baseY-h*0.1}, ${cx} ${baseY}
-            C ${cx+bulge*0.3} ${baseY-h*0.1}, ${cx+bulge*0.7} ${midY+h*0.15}, ${cx+bulge*0.85} ${midY}
-            C ${cx+bulge} ${midY-h*0.1}, ${cx+bulge*0.3} ${tipY+h*0.1}, ${cx} ${tipY} Z
-        `);
-        leaf.setAttribute('fill', color.fill);
-        leaf.setAttribute('stroke', color.stroke);
-        leaf.setAttribute('stroke-width', '0.8');
-
-        const midrib = document.createElementNS(ns, 'line');
-        midrib.setAttribute('x1', cx); midrib.setAttribute('y1', tipY+2);
-        midrib.setAttribute('x2', cx); midrib.setAttribute('y2', baseY-2);
-        midrib.setAttribute('stroke', color.vein);
-        midrib.setAttribute('stroke-width', '0.8');
-        midrib.setAttribute('opacity', '0.6');
-
-        const veins = document.createElementNS(ns, 'g');
-        veins.setAttribute('stroke', color.vein);
-        veins.setAttribute('stroke-width', '0.5');
-        veins.setAttribute('opacity', '0.35');
-        veins.setAttribute('fill', 'none');
-        for (let i = 1; i <= 4; i++) {
-            const vy = tipY + (baseY-tipY)*(i/5);
-            const sp = bulge*0.55*Math.sin(Math.PI*i/5);
-            const vl = document.createElementNS(ns, 'path');
-            vl.setAttribute('d', `M ${cx} ${vy} Q ${cx-sp*0.5} ${vy-3}, ${cx-sp} ${vy-1}`);
-            veins.appendChild(vl);
-            const vr = document.createElementNS(ns, 'path');
-            vr.setAttribute('d', `M ${cx} ${vy} Q ${cx+sp*0.5} ${vy-3}, ${cx+sp} ${vy-1}`);
-            veins.appendChild(vr);
-        }
-
-        const hl = document.createElementNS(ns, 'ellipse');
-        hl.setAttribute('cx', cx-w*0.1); hl.setAttribute('cy', midY-h*0.05);
-        hl.setAttribute('rx', w*0.15); hl.setAttribute('ry', h*0.12);
-        hl.setAttribute('fill', 'rgba(255,255,255,0.12)');
-        hl.setAttribute('transform', `rotate(-15 ${cx} ${midY})`);
-
-        svg.appendChild(leaf);
-        svg.appendChild(midrib);
-        svg.appendChild(veins);
-        svg.appendChild(hl);
-        return svg;
-    }
-
-    // ====== Position ======
-    function getLeafPosition(index) {
-        const tip = branchTips[index % branchTips.length];
-        return {
-            xPercent: Math.max(10, Math.min(90, tip.x + (Math.random()-0.5)*8)),
-            yPercent: Math.max(8, Math.min(52, tip.y + (Math.random()-0.5)*6))
-        };
-    }
-
-    // ====== Render leaf element ======
-    function renderLeaf(leafData, index, animate) {
-        const el = document.createElement('div');
-        el.className = 'tree-leaf' + (animate ? ' flash' : ' sway');
-        const size = 20 + Math.random()*12;
-        const color = leafColors[index % leafColors.length];
-        const rot = (Math.random()-0.5)*60;
-        el.style.cssText = `
-            left:${leafData.xPercent}%; top:${leafData.yPercent}%;
-            width:${size}px; height:${size*1.4}px;
-            --leaf-rot:${rot}deg; --sway-dur:${3+Math.random()*3}s; --sway-delay:${Math.random()*2}s;
-            transform:translate(-50%,-50%) rotate(${rot}deg);
-        `;
-        el.appendChild(createLeafSVG(color, size));
-        el.addEventListener('click', (e) => { e.stopPropagation(); showPopup(leafData); });
-        if (animate) setTimeout(() => { el.classList.remove('flash'); el.classList.add('sway'); }, 800);
-        return el;
-    }
-
-    // ====== Render all ======
-    function renderAllLeaves() {
-        leavesContainer.innerHTML = '';
-        leaves.forEach((l, i) => leavesContainer.appendChild(renderLeaf(l, i, false)));
-        updateCount();
-    }
-
-    // ====== Add leaf ======
-    function addLeaf(text) {
-        if (!text || !text.trim()) {
-            setStatus('请先写下你的心声…', 'rgba(240,180,80,0.8)', 2000);
-            return;
-        }
-        const clean = text.trim().slice(0, 80);
-        const pos = getLeafPosition(leaves.length);
-        const leafData = {
-            text: clean,
-            xPercent: pos.xPercent,
-            yPercent: pos.yPercent,
-            timestamp: Date.now(),
-            id: 'leaf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)
-        };
-
-        // If Firebase is connected, push to cloud (listener will add it locally)
-        if (firebaseReady && dbRef) {
-            dbRef.push(leafData);
-            setStatus(`🍃 已同步：「${clean.length > 12 ? clean.slice(0,11)+'…' : clean}」`, 'rgba(160,220,100,0.8)', 2500);
-        } else {
-            // Local only
-            leaves.push(leafData);
-            saveLocal();
-            leavesContainer.appendChild(renderLeaf(leafData, leaves.length-1, true));
-            createParticleBurst(pos.xPercent, pos.yPercent);
-            updateCount();
-            setStatus(`🍃 新叶：「${clean.length > 12 ? clean.slice(0,11)+'…' : clean}」（本地模式）`, 'rgba(160,220,100,0.8)', 2500);
-        }
-    }
-
-    function setStatus(msg, color, duration) {
-        statusText.textContent = msg;
-        statusText.style.color = color || '';
-        if (duration) setTimeout(() => {
-            statusText.textContent = firebaseReady ? '☁️ 实时同步中 · 点击树叶查看内容' : '点击树叶可以查看完整内容';
-            statusText.style.color = '';
-        }, duration);
-    }
-
-    function updateCount() {
-        leafBadge.textContent = `🍃 ${leaves.length} 片树叶`;
-    }
-
-    // ====== Particles ======
-    function createParticleBurst(xPct, yPct) {
-        for (let i = 0; i < 8; i++) {
-            const p = document.createElement('div');
-            p.className = 'particle';
-            const a = (Math.PI*2*i)/8 + (Math.random()-0.5)*0.5;
-            const d = 20 + Math.random()*30;
-            p.style.cssText = `
-                left:${xPct}%; top:${yPct}%;
-                background:${['#c8ff70','#ffe880','#90e040','#ffd060'][i%4]};
-                --px:${Math.cos(a)*d}px; --py:${Math.sin(a)*d}px;
-                animation:particleBurst 0.6s ease-out forwards;
-            `;
-            treeScene.appendChild(p);
-            setTimeout(() => p.remove(), 700);
-        }
-    }
-
-    // ====== Popup ======
-    function showPopup(leafData) {
-        popupText.textContent = leafData.text;
-        const d = new Date(leafData.timestamp);
-        popupTime.textContent = d.toLocaleString('zh-CN', { month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
-        popupOverlay.classList.add('visible');
-    }
-    popupOverlay.addEventListener('click', (e) => { if (e.target === popupOverlay) popupOverlay.classList.remove('visible'); });
-    popupClose.addEventListener('click', () => popupOverlay.classList.remove('visible'));
-
-    // ====== Local storage ======
-    function saveLocal() {
-        try { localStorage.setItem(LEAVES_KEY, JSON.stringify(leaves)); } catch(e) {}
-    }
-    function loadLocal() {
-        try {
-            const d = localStorage.getItem(LEAVES_KEY);
-            if (d) { leaves = JSON.parse(d); return true; }
-        } catch(e) {}
-        return false;
-    }
-
-    // ====== Firebase ======
-    function saveConfig(cfg) {
-        try { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); } catch(e) {}
-    }
-    function loadConfig() {
-        try {
-            const d = localStorage.getItem(CONFIG_KEY);
-            return d ? JSON.parse(d) : null;
-        } catch(e) { return null; }
-    }
-
-    function initFirebase(cfg) {
-        try {
-            // Prevent double init
-            if (firebase.apps.length === 0) {
-                firebase.initializeApp(cfg);
-            }
-            const db = firebase.database();
-            dbRef = db.ref('wish-tree/leaves');
-
-            // Listen for child_added (real-time new leaves)
-            dbRef.on('child_added', (snapshot) => {
-                const leafData = snapshot.val();
-                if (!leafData) return;
-                // Avoid duplicates
-                if (leaves.find(l => l.id === leafData.id)) return;
-                leaves.push(leafData);
-                const el = renderLeaf(leafData, leaves.length-1, true);
-                leavesContainer.appendChild(el);
-                createParticleBurst(leafData.xPercent, leafData.yPercent);
-                updateCount();
-            });
-
-            // Listen for removal (reset)
-            dbRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (!data && leaves.length > 0) {
-                    // All deleted
-                    leaves = [];
-                    leavesContainer.innerHTML = '';
-                    updateCount();
-                }
-            });
-
-            firebaseReady = true;
-            syncBadge.textContent = '☁️ 实时同步中';
-            syncBadge.classList.remove('offline');
-            statusText.textContent = '☁️ 已连接云端，所有设备实时同步！';
-            console.log('Firebase connected');
-            return true;
-        } catch(e) {
-            console.error('Firebase init failed:', e);
-            syncBadge.textContent = '❌ 连接失败';
-            syncBadge.classList.add('offline');
-            return false;
-        }
-    }
-
-    // ====== Reset ======
-    async function resetTree() {
-        if (leaves.length > 0 && !confirm('🍂 确定要重置大树吗？所有设备上的树叶都会消失。')) return;
-        if (firebaseReady && dbRef) {
-            await dbRef.remove();
-        }
-        leaves = [];
-        saveLocal();
-        leavesContainer.innerHTML = '';
-        updateCount();
-        setStatus('🍂 大树已重置，等待新的心声…', 'rgba(200,180,100,0.7)', 3000);
-    }
-
-    // ====== Config modal ======
-    function showConfig() { configOverlay.classList.remove('hidden'); }
-    function hideConfig() { configOverlay.classList.add('hidden'); }
-
-    document.getElementById('cfgSaveBtn').addEventListener('click', () => {
-        const cfg = {
-            apiKey: document.getElementById('cfgApiKey').value.trim(),
-            authDomain: document.getElementById('cfgAuthDomain').value.trim(),
-            databaseURL: document.getElementById('cfgDbUrl').value.trim(),
-            projectId: document.getElementById('cfgProjectId').value.trim(),
-        };
-        if (!cfg.apiKey || !cfg.databaseURL) {
-            alert('请至少填写 API Key 和 Database URL');
-            return;
-        }
-        saveConfig(cfg);
-        leaves = [];
-        leavesContainer.innerHTML = '';
-        initFirebase(cfg);
-        hideConfig();
-    });
-    document.getElementById('cfgSkipBtn').addEventListener('click', () => {
-        syncBadge.textContent = '📱 本地模式';
-        syncBadge.classList.add('offline');
-        hideConfig();
-    });
-
-    // ====== Voice ======
-    let recognition = null, isListening = false;
-    function initSpeech() {
-        const API = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!API) { voiceBtn.style.opacity='0.4'; voiceBtn.style.pointerEvents='none'; voiceBtn.textContent='🎙️ 不支持'; return; }
-        recognition = new API();
-        recognition.lang = 'zh-CN';
-        recognition.interimResults = false;
-        recognition.onstart = () => { isListening=true; voiceBtn.textContent='🎙️ 聆听中…'; voiceBtn.style.borderColor='rgba(240,80,80,0.5)'; };
-        recognition.onresult = (e) => { const t=e.results[0][0].transcript; if(t&&t.trim()) addLeaf(t); stopSpeech(); };
-        recognition.onerror = () => stopSpeech();
-        recognition.onend = () => stopSpeech();
-    }
-    function stopSpeech() { isListening=false; voiceBtn.textContent='🎙️ 语音输入'; voiceBtn.style.borderColor=''; }
-    function toggleSpeech() { if(!recognition){initSpeech();if(!recognition)return;} if(isListening){recognition.stop();stopSpeech();return;} try{recognition.start();}catch(e){} }
-
-    // ====== Stars & fireflies ======
-    function createStars() {
-        const c = document.getElementById('starsContainer');
-        for (let i=0;i<60;i++) {
-            const s=document.createElement('div'); s.className='star';
-            s.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*50}%;--dur:${2+Math.random()*4}s;--brightness:${0.3+Math.random()*0.7};animation-delay:${Math.random()*4}s;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;`;
-            c.appendChild(s);
-        }
-    }
-    function createFireflies() {
-        const c=document.getElementById('firefliesContainer');
-        for(let i=0;i<6;i++){
-            const f=document.createElement('div');f.className='firefly';
-            f.style.cssText=`left:${20+Math.random()*60}%;top:${30+Math.random()*50}%;--fly-dur:${5+Math.random()*6}s;--fx:${(Math.random()-0.5)*80}px;--fy:${(Math.random()-0.5)*60}px;--fx2:${(Math.random()-0.5)*100}px;--fy2:${(Math.random()-0.5)*80}px;animation-delay:${Math.random()*6}s;width:${3+Math.random()*3}px;height:${3+Math.random()*3}px;`;
-            c.appendChild(f);
-        }
-    }
-
-    // ====== Events ======
-    sendBtn.addEventListener('click', () => { addLeaf(textInput.value); textInput.value=''; textInput.focus(); });
-    textInput.addEventListener('keypress', (e) => { if(e.key==='Enter'){addLeaf(textInput.value);textInput.value='';} });
-    voiceBtn.addEventListener('click', toggleSpeech);
-    resetBtn.addEventListener('click', resetTree);
-    configBtn.addEventListener('click', showConfig);
-
-    // ====== Init ======
-    function init() {
-        createStars();
-        createFireflies();
-        initSpeech();
-
-        // Try to connect Firebase with saved config
-        const cfg = loadConfig();
-        if (cfg && cfg.apiKey && cfg.databaseURL) {
-            // Fill config fields
-            document.getElementById('cfgApiKey').value = cfg.apiKey;
-            document.getElementById('cfgAuthDomain').value = cfg.authDomain || '';
-            document.getElementById('cfgDbUrl').value = cfg.databaseURL;
-            document.getElementById('cfgProjectId').value = cfg.projectId || '';
-            initFirebase(cfg);
-        } else {
-            // No config saved, show config modal
-            syncBadge.textContent = '⚙️ 未配置同步';
-            syncBadge.classList.add('offline');
-            loadLocal();
-            renderAllLeaves();
-            // Auto-show config on first visit
-            showConfig();
-        }
-    }
-
-    init();
+(function(){'use strict';
+let leaves=[],ws=null,wsConnected=false,reconnectTimer=null;
+const lC=document.getElementById('leavesContainer'),tI=document.getElementById('textInput'),sB=document.getElementById('sendBtn'),rB=document.getElementById('resetBtn'),sT=document.getElementById('statusText'),lB=document.getElementById('leafBadge'),syB=document.getElementById('syncBadge'),pO=document.getElementById('popupOverlay'),pCl=document.getElementById('popupClose'),pT=document.getElementById('popupText'),pTi=document.getElementById('popupTime'),tS=document.getElementById('treeScene'),sTr=document.getElementById('sidebarTrack'),sE=document.getElementById('sidebarEmpty'),sF=document.getElementById('sidebarFooter');
+const bT=[{x:18.3,y:25},{x:19.4,y:26.6},{x:21.1,y:34.7},{x:23.9,y:27.4},{x:26.1,y:18.5},{x:30.6,y:43.2},{x:32.2,y:49.2},{x:32.8,y:29},{x:32.2,y:22.6},{x:43.9,y:21},{x:46.2,y:12.1},{x:48.7,y:12.9},{x:51.3,y:11.3},{x:55,y:20.2},{x:66.1,y:31.5},{x:68.3,y:43.9},{x:68.3,y:50},{x:74.4,y:20.2},{x:78.3,y:28.2},{x:78.3,y:39.5},{x:81.7,y:27.4},{x:82.2,y:27.4},{x:22,y:30},{x:28,y:23},{x:35,y:25},{x:38,y:17},{x:42,y:15},{x:48,y:14},{x:52,y:16},{x:56,y:21},{x:60,y:25},{x:65,y:23},{x:70,y:27},{x:75,y:23},{x:30,y:35},{x:36,y:31},{x:40,y:27},{x:50,y:19},{x:58,y:27},{x:62,y:34},{x:68,y:31},{x:72,y:35},{x:25,y:37},{x:45,y:23},{x:55,y:24},{x:63,y:39},{x:34,y:43},{x:20,y:33},{x:27,y:28},{x:33,y:22},{x:43,y:18},{x:53,y:18},{x:59,y:30},{x:66,y:36},{x:73,y:30},{x:78,y:34}];
+const lCo=[{fill:'#4a9228',stroke:'#35701a',vein:'#3e8220',hi:'rgba(180,255,120,.15)'},{fill:'#5ca832',stroke:'#3d7a1c',vein:'#4a8a28',hi:'rgba(200,255,150,.12)'},{fill:'#6db840',stroke:'#4a8a28',vein:'#5aa032',hi:'rgba(210,255,160,.12)'},{fill:'#7ec850',stroke:'#5aa035',vein:'#6ab040',hi:'rgba(220,255,170,.1)'},{fill:'#88d060',stroke:'#60a840',vein:'#70b848',hi:'rgba(220,255,180,.1)'},{fill:'#78c048',stroke:'#58a030',vein:'#68b040',hi:'rgba(200,255,150,.12)'},{fill:'#60b035',stroke:'#408820',vein:'#509828',hi:'rgba(190,255,140,.13)'},{fill:'#4da030',stroke:'#388018',vein:'#429025',hi:'rgba(180,255,130,.14)'},{fill:'#9ad870',stroke:'#70b048',vein:'#80c058',hi:'rgba(230,255,200,.1)'},{fill:'#a0d880',stroke:'#78b858',vein:'#88c868',hi:'rgba(235,255,210,.1)'}];
+function mkSVG(c,sz){const w=sz,h=sz*1.5,ns='http://www.w3.org/2000/svg';const s=document.createElementNS(ns,'svg');s.setAttribute('viewBox',`0 0 ${w} ${h}`);s.setAttribute('width',w);s.setAttribute('height',h);s.style.overflow='visible';const cx=w/2,tY=1,bY=h-2,mY=h*.38,bu=w*.48;const lf=document.createElementNS(ns,'path');lf.setAttribute('d',`M ${cx} ${tY} C ${cx-bu*.2} ${tY+h*.08},${cx-bu*.95} ${mY-h*.12},${cx-bu*.88} ${mY} C ${cx-bu*.78} ${mY+h*.12},${cx-bu*.4} ${bY-h*.15},${cx+1} ${bY} C ${cx+bu*.35} ${bY-h*.12},${cx+bu*.75} ${mY+h*.15},${cx+bu*.85} ${mY+h*.02} C ${cx+bu*.92} ${mY-h*.1},${cx+bu*.25} ${tY+h*.1},${cx} ${tY} Z`);lf.setAttribute('fill',c.fill);lf.setAttribute('stroke',c.stroke);lf.setAttribute('stroke-width','.6');const sh=document.createElementNS(ns,'path');sh.setAttribute('d',`M ${cx+1} ${bY} C ${cx+bu*.35} ${bY-h*.12},${cx+bu*.75} ${mY+h*.15},${cx+bu*.85} ${mY+h*.02} C ${cx+bu*.92} ${mY-h*.1},${cx+bu*.25} ${tY+h*.1},${cx} ${tY}`);sh.setAttribute('fill','rgba(0,0,0,.06)');sh.setAttribute('stroke','none');const mr=document.createElementNS(ns,'path');mr.setAttribute('d',`M ${cx} ${tY+2} Q ${cx+.5} ${mY},${cx+1} ${bY-2}`);mr.setAttribute('stroke',c.vein);mr.setAttribute('stroke-width','.9');mr.setAttribute('fill','none');mr.setAttribute('opacity','.55');const vg=document.createElementNS(ns,'g');vg.setAttribute('stroke',c.vein);vg.setAttribute('stroke-width','.4');vg.setAttribute('opacity','.3');vg.setAttribute('fill','none');for(let i=1;i<=5;i++){const t=i/6,vy=tY+(bY-tY)*t,vcx=cx+.5*t,sp=bu*.5*Math.sin(Math.PI*t);const vl=document.createElementNS(ns,'path');vl.setAttribute('d',`M ${vcx} ${vy} Q ${vcx-sp*.5} ${vy-4*t},${vcx-sp*.9} ${vy-2}`);vg.appendChild(vl);const vr=document.createElementNS(ns,'path');vr.setAttribute('d',`M ${vcx} ${vy} Q ${vcx+sp*.5} ${vy-3*t},${vcx+sp*.85} ${vy-1}`);vg.appendChild(vr)}const hl=document.createElementNS(ns,'ellipse');hl.setAttribute('cx',cx-w*.12);hl.setAttribute('cy',mY-h*.03);hl.setAttribute('rx',w*.14);hl.setAttribute('ry',h*.1);hl.setAttribute('fill',c.hi||'rgba(255,255,255,.1)');hl.setAttribute('transform',`rotate(-20 ${cx} ${mY})`);s.appendChild(lf);s.appendChild(sh);s.appendChild(mr);s.appendChild(vg);s.appendChild(hl);return s}
+function gLP(i){const t=bT[i%bT.length];return{xPercent:Math.max(12,Math.min(88,t.x+(Math.random()-.5)*7)),yPercent:Math.max(6,Math.min(52,t.y+(Math.random()-.5)*5))}}
+function rL(d,i,a){const e=document.createElement('div');e.className='tree-leaf'+(a?' flash':' sway');const sz=18+Math.random()*14,co=lCo[i%lCo.length],ro=(Math.random()-.5)*70;e.style.cssText=`left:${d.xPercent}%;top:${d.yPercent}%;width:${sz}px;height:${sz*1.5}px;--leaf-rot:${ro}deg;--sway-dur:${3+Math.random()*4}s;--sway-delay:${Math.random()*3}s;transform:translate(-50%,-50%) rotate(${ro}deg);`;e.appendChild(mkSVG(co,sz));e.addEventListener('click',(ev)=>{ev.stopPropagation();showPopup(d)});if(a)setTimeout(()=>{e.classList.remove('flash');e.classList.add('sway')},900);return e}
+function renderAll(){lC.innerHTML='';leaves.forEach((l,i)=>lC.appendChild(rL(l,i,false)));uC();uS()}
+function uC(){lB.textContent=`🍃 ${leaves.length} 片树叶`}
+function setSt(m,c,d){sT.textContent=m;sT.style.color=c||'';if(d)setTimeout(()=>{sT.textContent=wsConnected?'☁️ 实时同步中 · 点击树叶查看':'点击树叶可以查看完整内容';sT.style.color=''},d)}
+function uS(){if(!leaves.length){sE.style.display='block';sTr.style.display='none';sF.textContent='等待第一片树叶…';return}sE.style.display='none';sTr.style.display='block';sF.textContent=`共 ${leaves.length} 条心语 · 自动滚动`;sTr.innerHTML='';const items=[...leaves,...leaves];items.forEach((l,i)=>{const idx=i%leaves.length;const d=document.createElement('div');d.className='sidebar-item';d.innerHTML=`<div class="sidebar-item-text"><span class="sidebar-item-index">${idx+1}</span>${esc(l.text)}</div><div class="sidebar-item-time">${fmtT(l.timestamp)}</div>`;d.addEventListener('click',()=>showPopup(leaves[idx]));sTr.appendChild(d)});const dur=Math.max(15,leaves.length*4);sTr.style.animation=`sidebarScroll ${dur}s linear infinite`}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtT(ts){return new Date(ts).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+function connectWS(){const p=location.protocol==='https:'?'wss:':'ws:';const h=location.host||location.hostname+':3000';try{ws=new WebSocket(`${p}//${h}`)}catch(e){sofl();return}ws.onopen=()=>{wsConnected=true;syB.textContent='☁️ 实时同步中';syB.className='sync-badge';setSt('☁️ 已连接，所有设备实时同步！','rgba(160,220,100,.8)',3000);if(reconnectTimer){clearInterval(reconnectTimer);reconnectTimer=null}};ws.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);if(m.type==='init'){leaves=m.leaves||[];renderAll()}else if(m.type==='add'){if(!leaves.find(l=>l.id===m.leaf.id)){leaves.push(m.leaf);lC.appendChild(rL(m.leaf,leaves.length-1,true));cPB(m.leaf.xPercent,m.leaf.yPercent);uC();uS()}}else if(m.type==='reset'){leaves=[];lC.innerHTML='';uC();uS();setSt('🍂 大树已被重置','rgba(200,180,100,.7)',2500)}}catch(e){}};ws.onclose=()=>{wsConnected=false;sofl();if(!reconnectTimer)reconnectTimer=setInterval(()=>{if(!wsConnected)connectWS()},3000)};ws.onerror=()=>sofl()}
+function sofl(){syB.textContent='🔄 重连中…';syB.className='sync-badge connecting'}
+function sWS(m){if(ws&&ws.readyState===WebSocket.OPEN){ws.send(JSON.stringify(m));return true}return false}
+function addLeaf(t){if(!t||!t.trim()){setSt('请先写下你的心声…','rgba(240,180,80,.8)',2000);return}const c=t.trim().slice(0,80);const p=gLP(leaves.length);const d={text:c,xPercent:p.xPercent,yPercent:p.yPercent,timestamp:Date.now(),id:'leaf_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)};if(sWS({type:'add',leaf:d})){setSt(`🍃 已同步：「${c.length>12?c.slice(0,11)+'…':c}」`,'rgba(160,220,100,.8)',2500)}else{leaves.push(d);lC.appendChild(rL(d,leaves.length-1,true));cPB(p.xPercent,p.yPercent);uC();uS();setSt(`🍃 新叶：「${c.length>12?c.slice(0,11)+'…':c}」`,'rgba(160,220,100,.8)',2500)}}
+function resetTree(){if(leaves.length>0&&!confirm('🍂 确定重置？所有树叶都会消失。'))return;if(!sWS({type:'reset'})){leaves=[];lC.innerHTML='';uC();uS();setSt('🍂 大树已重置','rgba(200,180,100,.7)',3000)}}
+function cPB(x,y){for(let i=0;i<10;i++){const p=document.createElement('div');p.className='particle';const a=(Math.PI*2*i)/10+(Math.random()-.5)*.5,d=20+Math.random()*35,sz=2+Math.random()*3;p.style.cssText=`left:${x}%;top:${y}%;width:${sz}px;height:${sz}px;background:${['#c8ff70','#ffe880','#90e040','#ffd060','#a0ff50'][i%5]};--px:${Math.cos(a)*d}px;--py:${Math.sin(a)*d}px;animation:particleBurst .7s ease-out forwards;`;tS.appendChild(p);setTimeout(()=>p.remove(),800)}}
+function showPopup(d){pT.textContent=d.text;pTi.textContent=new Date(d.timestamp).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});pO.classList.add('visible')}
+pO.addEventListener('click',(e)=>{if(e.target===pO)pO.classList.remove('visible')});pCl.addEventListener('click',()=>pO.classList.remove('visible'));
+function mkStars(){const c=document.getElementById('starsContainer');for(let i=0;i<80;i++){const s=document.createElement('div');s.className='star';const sz=.5+Math.random()*2.5;s.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*55}%;width:${sz}px;height:${sz}px;--dur:${1.5+Math.random()*5}s;--brightness:${.25+Math.random()*.75};animation-delay:${Math.random()*5}s;`;c.appendChild(s)}for(let i=0;i<3;i++){const ss=document.createElement('div');ss.className='shooting-star';const an=-30-Math.random()*20;ss.style.cssText=`left:${20+Math.random()*60}%;top:${5+Math.random()*20}%;--shoot-dur:${8+Math.random()*12}s;--shoot-angle:${an}deg;--shoot-x:${150+Math.random()*200}px;--shoot-y:${80+Math.random()*120}px;animation-delay:${i*5+Math.random()*8}s;`;c.appendChild(ss)}}
+function mkFF(){const c=document.getElementById('firefliesContainer');for(let i=0;i<8;i++){const f=document.createElement('div');f.className='firefly';const sz=3+Math.random()*4;f.style.cssText=`left:${15+Math.random()*70}%;top:${25+Math.random()*55}%;width:${sz}px;height:${sz}px;--fly-dur:${4+Math.random()*7}s;--fx:${(Math.random()-.5)*100}px;--fy:${(Math.random()-.5)*70}px;--fx2:${(Math.random()-.5)*120}px;--fy2:${(Math.random()-.5)*90}px;animation-delay:${Math.random()*8}s;`;c.appendChild(f)}}
+function mkPetals(){const c=document.getElementById('starsContainer');for(let i=0;i<5;i++){const p=document.createElement('div');p.className='petal';const sz=4+Math.random()*4;p.innerHTML=`<svg width="${sz}" height="${sz*1.3}" viewBox="0 0 10 13"><ellipse cx="5" cy="6.5" rx="4" ry="6" fill="rgba(180,255,120,.4)" stroke="rgba(120,200,80,.3)" stroke-width=".5"/></svg>`;p.style.cssText=`left:${10+Math.random()*80}%;top:-5%;--petal-dur:${12+Math.random()*18}s;--petal-x:${(Math.random()-.5)*150}px;--petal-y:${500+Math.random()*400}px;--petal-rot:${200+Math.random()*400}deg;animation-delay:${Math.random()*20}s;`;c.appendChild(p)}}
+sB.addEventListener('click',()=>{addLeaf(tI.value);tI.value='';tI.focus()});
+tI.addEventListener('keypress',(e)=>{if(e.key==='Enter'){addLeaf(tI.value);tI.value=''}});
+rB.addEventListener('click',resetTree);
+mkStars();mkFF();mkPetals();connectWS()
 })();
 </script>
 </body>
