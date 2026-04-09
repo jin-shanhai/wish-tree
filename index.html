@@ -6,6 +6,9 @@
     <title>心愿之树 · 每一片叶子都有故事</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
     <style>
         :root{--sky-top:#050e1a;--sky-mid:#0f2840;--sky-bottom:#1a3a28;--ground:#0e1f14;--gold:#f0c850;--gold-dim:#c8a030;--leaf-shadow:rgba(0,0,0,0.35)}
         *{margin:0;padding:0;box-sizing:border-box}
@@ -32,8 +35,7 @@
         .leaf-count-badge,.sync-badge{display:inline-block;padding:3px 16px;border-radius:20px;font-size:.8rem;backdrop-filter:blur(4px)}
         .leaf-count-badge{background:rgba(240,200,80,.12);border:1px solid rgba(240,200,80,.25);color:var(--gold)}
         .sync-badge{background:rgba(100,200,120,.12);border:1px solid rgba(100,200,120,.25);color:#8ad8a0;font-size:.75rem}
-        .sync-badge.offline{background:rgba(240,100,80,.12);border-color:rgba(240,100,80,.25);color:#e8a090}
-        .sync-badge.connecting{background:rgba(240,200,80,.12);border-color:rgba(240,200,80,.25);color:#e8d080}
+        .sync-badge.err{background:rgba(240,100,80,.12);border-color:rgba(240,100,80,.25);color:#e8a090}
         @keyframes fadeSlideDown{0%{opacity:0;transform:translateY(-20px)}100%{opacity:1;transform:translateY(0)}}
         .content-area{display:flex;gap:20px;width:100%;max-width:1300px;align-items:stretch;margin-bottom:20px}
         .tree-scene{position:relative;flex:1;min-width:0;aspect-ratio:16/11;min-height:400px;border-radius:20px;overflow:hidden;background:radial-gradient(ellipse at 50% 85%,#142e18 0%,#0a1a0e 55%,#050e08 100%);box-shadow:0 0 60px rgba(0,0,0,.5),inset 0 0 100px rgba(0,0,0,.5),0 0 1px rgba(100,200,80,.2)}
@@ -107,7 +109,7 @@
     <header class="page-header">
         <h1>心 愿 之 树</h1>
         <div class="subtitle">每一片叶子，都承载一份心声</div>
-        <div class="badges"><div class="leaf-count-badge" id="leafBadge">🍃 0 片树叶</div><div class="sync-badge" id="syncBadge">🔍 检测中…</div></div>
+        <div class="badges"><div class="leaf-count-badge" id="leafBadge">🍃 0 片树叶</div><div class="sync-badge" id="syncBadge">⏳ 连接中…</div></div>
     </header>
     <div class="content-area">
         <div class="tree-scene" id="treeScene">
@@ -130,9 +132,9 @@
             <div class="leaves-container" id="leavesContainer"></div>
             <div id="firefliesContainer"></div>
         </div>
-        <div class="leaf-sidebar" id="leafSidebar">
+        <div class="leaf-sidebar">
             <div class="sidebar-header"><div class="sidebar-icon">🍃</div><h2>叶片心语</h2></div>
-            <div class="sidebar-scroll" id="sidebarScroll"><div class="sidebar-empty" id="sidebarEmpty">还没有树叶，写下第一片吧…</div><div class="sidebar-track" id="sidebarTrack"></div></div>
+            <div class="sidebar-scroll"><div class="sidebar-empty" id="sidebarEmpty">还没有树叶，写下第一片吧…</div><div class="sidebar-track" id="sidebarTrack"></div></div>
             <div class="sidebar-footer" id="sidebarFooter">自动循环滚动 · 悬停暂停</div>
         </div>
     </div>
@@ -146,38 +148,148 @@
     <footer class="page-footer">心愿之树 · 每一片叶子都承载一份心声</footer>
 </div>
 <div class="leaf-popup-overlay" id="popupOverlay"><div class="leaf-popup"><button class="popup-close" id="popupClose">✕</button><span class="popup-leaf-icon">🍀</span><div class="popup-text" id="popupText"></div><div class="popup-time" id="popupTime"></div></div></div>
+
 <script>
 (function(){'use strict';
-let leaves=[],ws=null,wsConnected=false,reconnectTimer=null,wsRetries=0,localMode=false;const STORAGE_KEY='wish_tree_leaves_v3';
+
+// ====== Firebase 配置（已写死）======
+firebase.initializeApp({
+    apiKey: "AIzaSyCxn35jkodZ0qIAkDAxzqUUvNi1ZOGe3ww",
+    authDomain: "wish-tree-a6b4e.firebaseapp.com",
+    databaseURL: "https://wish-tree-a6b4e-default-rtdb.firebaseio.com",
+    projectId: "wish-tree-a6b4e",
+    storageBucket: "wish-tree-a6b4e.firebasestorage.app",
+    messagingSenderId: "333802650650",
+    appId: "1:333802650650:web:87dd2f85bb40a63046a5a3"
+});
+
+const db = firebase.database();
+const dbRef = db.ref('wish-tree/leaves');
+let firebaseOK = false;
+let leaves = [];
+let knownIds = new Set();
+
+// ====== DOM ======
 const lC=document.getElementById('leavesContainer'),tI=document.getElementById('textInput'),sB=document.getElementById('sendBtn'),rB=document.getElementById('resetBtn'),sT=document.getElementById('statusText'),lB=document.getElementById('leafBadge'),syB=document.getElementById('syncBadge'),pO=document.getElementById('popupOverlay'),pCl=document.getElementById('popupClose'),pT=document.getElementById('popupText'),pTi=document.getElementById('popupTime'),tS=document.getElementById('treeScene'),sTr=document.getElementById('sidebarTrack'),sE=document.getElementById('sidebarEmpty'),sF=document.getElementById('sidebarFooter');
+
+// ====== Branch tips ======
 const bT=[{x:18.3,y:25},{x:19.4,y:26.6},{x:21.1,y:34.7},{x:23.9,y:27.4},{x:26.1,y:18.5},{x:30.6,y:43.2},{x:32.2,y:49.2},{x:32.8,y:29},{x:32.2,y:22.6},{x:43.9,y:21},{x:46.2,y:12.1},{x:48.7,y:12.9},{x:51.3,y:11.3},{x:55,y:20.2},{x:66.1,y:31.5},{x:68.3,y:43.9},{x:68.3,y:50},{x:74.4,y:20.2},{x:78.3,y:28.2},{x:78.3,y:39.5},{x:81.7,y:27.4},{x:82.2,y:27.4},{x:22,y:30},{x:28,y:23},{x:35,y:25},{x:38,y:17},{x:42,y:15},{x:48,y:14},{x:52,y:16},{x:56,y:21},{x:60,y:25},{x:65,y:23},{x:70,y:27},{x:75,y:23},{x:30,y:35},{x:36,y:31},{x:40,y:27},{x:50,y:19},{x:58,y:27},{x:62,y:34},{x:68,y:31},{x:72,y:35},{x:25,y:37},{x:45,y:23},{x:55,y:24},{x:63,y:39},{x:34,y:43},{x:20,y:33},{x:27,y:28},{x:33,y:22},{x:43,y:18},{x:53,y:18},{x:59,y:30},{x:66,y:36},{x:73,y:30},{x:78,y:34}];
 const lCo=[{fill:'#4a9228',stroke:'#35701a',vein:'#3e8220',hi:'rgba(180,255,120,.15)'},{fill:'#5ca832',stroke:'#3d7a1c',vein:'#4a8a28',hi:'rgba(200,255,150,.12)'},{fill:'#6db840',stroke:'#4a8a28',vein:'#5aa032',hi:'rgba(210,255,160,.12)'},{fill:'#7ec850',stroke:'#5aa035',vein:'#6ab040',hi:'rgba(220,255,170,.1)'},{fill:'#88d060',stroke:'#60a840',vein:'#70b848',hi:'rgba(220,255,180,.1)'},{fill:'#78c048',stroke:'#58a030',vein:'#68b040',hi:'rgba(200,255,150,.12)'},{fill:'#60b035',stroke:'#408820',vein:'#509828',hi:'rgba(190,255,140,.13)'},{fill:'#4da030',stroke:'#388018',vein:'#429025',hi:'rgba(180,255,130,.14)'},{fill:'#9ad870',stroke:'#70b048',vein:'#80c058',hi:'rgba(230,255,200,.1)'},{fill:'#a0d880',stroke:'#78b858',vein:'#88c868',hi:'rgba(235,255,210,.1)'}];
-function mkSVG(c,sz){const w=sz,h=sz*1.5,ns='http://www.w3.org/2000/svg';const s=document.createElementNS(ns,'svg');s.setAttribute('viewBox',`0 0 ${w} ${h}`);s.setAttribute('width',w);s.setAttribute('height',h);s.style.overflow='visible';const cx=w/2,tY=1,bY=h-2,mY=h*.38,bu=w*.48;const lf=document.createElementNS(ns,'path');lf.setAttribute('d',`M ${cx} ${tY} C ${cx-bu*.2} ${tY+h*.08},${cx-bu*.95} ${mY-h*.12},${cx-bu*.88} ${mY} C ${cx-bu*.78} ${mY+h*.12},${cx-bu*.4} ${bY-h*.15},${cx+1} ${bY} C ${cx+bu*.35} ${bY-h*.12},${cx+bu*.75} ${mY+h*.15},${cx+bu*.85} ${mY+h*.02} C ${cx+bu*.92} ${mY-h*.1},${cx+bu*.25} ${tY+h*.1},${cx} ${tY} Z`);lf.setAttribute('fill',c.fill);lf.setAttribute('stroke',c.stroke);lf.setAttribute('stroke-width','.6');const sh=document.createElementNS(ns,'path');sh.setAttribute('d',`M ${cx+1} ${bY} C ${cx+bu*.35} ${bY-h*.12},${cx+bu*.75} ${mY+h*.15},${cx+bu*.85} ${mY+h*.02} C ${cx+bu*.92} ${mY-h*.1},${cx+bu*.25} ${tY+h*.1},${cx} ${tY}`);sh.setAttribute('fill','rgba(0,0,0,.06)');sh.setAttribute('stroke','none');const mr=document.createElementNS(ns,'path');mr.setAttribute('d',`M ${cx} ${tY+2} Q ${cx+.5} ${mY},${cx+1} ${bY-2}`);mr.setAttribute('stroke',c.vein);mr.setAttribute('stroke-width','.9');mr.setAttribute('fill','none');mr.setAttribute('opacity','.55');const vg=document.createElementNS(ns,'g');vg.setAttribute('stroke',c.vein);vg.setAttribute('stroke-width','.4');vg.setAttribute('opacity','.3');vg.setAttribute('fill','none');for(let i=1;i<=5;i++){const t=i/6,vy=tY+(bY-tY)*t,vcx=cx+.5*t,sp=bu*.5*Math.sin(Math.PI*t);const vl=document.createElementNS(ns,'path');vl.setAttribute('d',`M ${vcx} ${vy} Q ${vcx-sp*.5} ${vy-4*t},${vcx-sp*.9} ${vy-2}`);vg.appendChild(vl);const vr=document.createElementNS(ns,'path');vr.setAttribute('d',`M ${vcx} ${vy} Q ${vcx+sp*.5} ${vy-3*t},${vcx+sp*.85} ${vy-1}`);vg.appendChild(vr)}const hl=document.createElementNS(ns,'ellipse');hl.setAttribute('cx',cx-w*.12);hl.setAttribute('cy',mY-h*.03);hl.setAttribute('rx',w*.14);hl.setAttribute('ry',h*.1);hl.setAttribute('fill',c.hi||'rgba(255,255,255,.1)');hl.setAttribute('transform',`rotate(-20 ${cx} ${mY})`);s.appendChild(lf);s.appendChild(sh);s.appendChild(mr);s.appendChild(vg);s.appendChild(hl);return s}
+
+// ====== Leaf SVG ======
+function mkSVG(c,sz){const w=sz,h=sz*1.5,ns='http://www.w3.org/2000/svg';const s=document.createElementNS(ns,'svg');s.setAttribute('viewBox','0 0 '+w+' '+h);s.setAttribute('width',w);s.setAttribute('height',h);s.style.overflow='visible';const cx=w/2,tY=1,bY=h-2,mY=h*.38,bu=w*.48;const lf=document.createElementNS(ns,'path');lf.setAttribute('d','M '+cx+' '+tY+' C '+(cx-bu*.2)+' '+(tY+h*.08)+','+(cx-bu*.95)+' '+(mY-h*.12)+','+(cx-bu*.88)+' '+mY+' C '+(cx-bu*.78)+' '+(mY+h*.12)+','+(cx-bu*.4)+' '+(bY-h*.15)+','+(cx+1)+' '+bY+' C '+(cx+bu*.35)+' '+(bY-h*.12)+','+(cx+bu*.75)+' '+(mY+h*.15)+','+(cx+bu*.85)+' '+(mY+h*.02)+' C '+(cx+bu*.92)+' '+(mY-h*.1)+','+(cx+bu*.25)+' '+(tY+h*.1)+','+cx+' '+tY+' Z');lf.setAttribute('fill',c.fill);lf.setAttribute('stroke',c.stroke);lf.setAttribute('stroke-width','.6');const sh=document.createElementNS(ns,'path');sh.setAttribute('d','M '+(cx+1)+' '+bY+' C '+(cx+bu*.35)+' '+(bY-h*.12)+','+(cx+bu*.75)+' '+(mY+h*.15)+','+(cx+bu*.85)+' '+(mY+h*.02)+' C '+(cx+bu*.92)+' '+(mY-h*.1)+','+(cx+bu*.25)+' '+(tY+h*.1)+','+cx+' '+tY);sh.setAttribute('fill','rgba(0,0,0,.06)');sh.setAttribute('stroke','none');const mr=document.createElementNS(ns,'path');mr.setAttribute('d','M '+cx+' '+(tY+2)+' Q '+(cx+.5)+' '+mY+','+(cx+1)+' '+(bY-2));mr.setAttribute('stroke',c.vein);mr.setAttribute('stroke-width','.9');mr.setAttribute('fill','none');mr.setAttribute('opacity','.55');const vg=document.createElementNS(ns,'g');vg.setAttribute('stroke',c.vein);vg.setAttribute('stroke-width','.4');vg.setAttribute('opacity','.3');vg.setAttribute('fill','none');for(let i=1;i<=5;i++){const t=i/6,vy=tY+(bY-tY)*t,vcx=cx+.5*t,sp=bu*.5*Math.sin(Math.PI*t);const vl=document.createElementNS(ns,'path');vl.setAttribute('d','M '+vcx+' '+vy+' Q '+(vcx-sp*.5)+' '+(vy-4*t)+','+(vcx-sp*.9)+' '+(vy-2));vg.appendChild(vl);const vr=document.createElementNS(ns,'path');vr.setAttribute('d','M '+vcx+' '+vy+' Q '+(vcx+sp*.5)+' '+(vy-3*t)+','+(vcx+sp*.85)+' '+(vy-1));vg.appendChild(vr)}const hl=document.createElementNS(ns,'ellipse');hl.setAttribute('cx',cx-w*.12);hl.setAttribute('cy',mY-h*.03);hl.setAttribute('rx',w*.14);hl.setAttribute('ry',h*.1);hl.setAttribute('fill',c.hi);hl.setAttribute('transform','rotate(-20 '+cx+' '+mY+')');s.appendChild(lf);s.appendChild(sh);s.appendChild(mr);s.appendChild(vg);s.appendChild(hl);return s}
+
 function gLP(i){const t=bT[i%bT.length];return{xPercent:Math.max(12,Math.min(88,t.x+(Math.random()-.5)*7)),yPercent:Math.max(6,Math.min(52,t.y+(Math.random()-.5)*5))}}
-function rL(d,i,a){const e=document.createElement('div');e.className='tree-leaf'+(a?' flash':' sway');const sz=18+Math.random()*14,co=lCo[i%lCo.length],ro=(Math.random()-.5)*70;e.style.cssText=`left:${d.xPercent}%;top:${d.yPercent}%;width:${sz}px;height:${sz*1.5}px;--leaf-rot:${ro}deg;--sway-dur:${3+Math.random()*4}s;--sway-delay:${Math.random()*3}s;transform:translate(-50%,-50%) rotate(${ro}deg);`;e.appendChild(mkSVG(co,sz));e.addEventListener('click',(ev)=>{ev.stopPropagation();showPopup(d)});if(a)setTimeout(()=>{e.classList.remove('flash');e.classList.add('sway')},900);return e}
-function renderAll(){lC.innerHTML='';leaves.forEach((l,i)=>lC.appendChild(rL(l,i,false)));uC();uS()}
-function uC(){lB.textContent=`🍃 ${leaves.length} 片树叶`}
-function setSt(m,c,d){sT.textContent=m;sT.style.color=c||'';if(d)setTimeout(()=>{sT.textContent=wsConnected?'☁️ 实时同步中 · 点击树叶查看':'点击树叶可以查看完整内容';sT.style.color=''},d)}
-function uS(){if(!leaves.length){sE.style.display='block';sTr.style.display='none';sF.textContent='等待第一片树叶…';return}sE.style.display='none';sTr.style.display='block';sF.textContent=`共 ${leaves.length} 条心语 · 自动滚动`;sTr.innerHTML='';const items=[...leaves,...leaves];items.forEach((l,i)=>{const idx=i%leaves.length;const d=document.createElement('div');d.className='sidebar-item';d.innerHTML=`<div class="sidebar-item-text"><span class="sidebar-item-index">${idx+1}</span>${esc(l.text)}</div><div class="sidebar-item-time">${fmtT(l.timestamp)}</div>`;d.addEventListener('click',()=>showPopup(leaves[idx]));sTr.appendChild(d)});const dur=Math.max(15,leaves.length*4);sTr.style.animation=`sidebarScroll ${dur}s linear infinite`}
-function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function rL(d,i,a){const e=document.createElement('div');e.className='tree-leaf'+(a?' flash':' sway');const sz=18+Math.random()*14,co=lCo[i%lCo.length],ro=(Math.random()-.5)*70;e.style.cssText='left:'+d.xPercent+'%;top:'+d.yPercent+'%;width:'+sz+'px;height:'+sz*1.5+'px;--leaf-rot:'+ro+'deg;--sway-dur:'+(3+Math.random()*4)+'s;--sway-delay:'+Math.random()*3+'s;transform:translate(-50%,-50%) rotate('+ro+'deg);';e.appendChild(mkSVG(co,sz));e.addEventListener('click',function(ev){ev.stopPropagation();showPopup(d)});if(a)setTimeout(function(){e.classList.remove('flash');e.classList.add('sway')},900);return e}
+
+function renderAll(){lC.innerHTML='';leaves.forEach(function(l,i){lC.appendChild(rL(l,i,false))});uC();uS()}
+function uC(){lB.textContent='🍃 '+leaves.length+' 片树叶'}
+function setSt(m,c,d){sT.textContent=m;sT.style.color=c||'';if(d)setTimeout(function(){sT.textContent='☁️ 实时同步中 · 点击树叶查看';sT.style.color=''},d)}
+
+// ====== Sidebar ======
+function uS(){if(!leaves.length){sE.style.display='block';sTr.style.display='none';sF.textContent='等待第一片树叶…';return}sE.style.display='none';sTr.style.display='block';sF.textContent='共 '+leaves.length+' 条心语 · 自动滚动';sTr.innerHTML='';var items=leaves.concat(leaves);items.forEach(function(l,i){var idx=i%leaves.length;var d=document.createElement('div');d.className='sidebar-item';d.innerHTML='<div class="sidebar-item-text"><span class="sidebar-item-index">'+(idx+1)+'</span>'+esc(l.text)+'</div><div class="sidebar-item-time">'+fmtT(l.timestamp)+'</div>';d.addEventListener('click',function(){showPopup(leaves[idx])});sTr.appendChild(d)});var dur=Math.max(15,leaves.length*4);sTr.style.animation='sidebarScroll '+dur+'s linear infinite'}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function fmtT(ts){return new Date(ts).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
-function goLocal(){localMode=true;wsConnected=false;if(reconnectTimer){clearInterval(reconnectTimer);reconnectTimer=null}syB.textContent='📱 本地模式';syB.className='sync-badge';loadLocal();renderAll();setSt('点击树叶可以查看完整内容','',0)}
-function saveLocal(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(leaves))}catch(e){}}
-function loadLocal(){try{const d=localStorage.getItem(STORAGE_KEY);if(d){leaves=JSON.parse(d);return true}}catch(e){}return false}
-function connectWS(){if(location.protocol==='file:'){goLocal();return}const p=location.protocol==='https:'?'wss:':'ws:';const h=location.host||location.hostname+':3000';try{ws=new WebSocket(`${p}//${h}`)}catch(e){goLocal();return}const timeout=setTimeout(()=>{if(!wsConnected){try{ws.close()}catch(e){}goLocal()}},3000);ws.onopen=()=>{clearTimeout(timeout);wsConnected=true;wsRetries=0;syB.textContent='☁️ 实时同步中';syB.className='sync-badge';setSt('☁️ 已连接，所有设备实时同步！','rgba(160,220,100,.8)',3000);if(reconnectTimer){clearInterval(reconnectTimer);reconnectTimer=null}};ws.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);if(m.type==='init'){leaves=m.leaves||[];renderAll()}else if(m.type==='add'){if(!leaves.find(l=>l.id===m.leaf.id)){leaves.push(m.leaf);lC.appendChild(rL(m.leaf,leaves.length-1,true));cPB(m.leaf.xPercent,m.leaf.yPercent);uC();uS()}}else if(m.type==='reset'){leaves=[];lC.innerHTML='';uC();uS();setSt('🍂 大树已被重置','rgba(200,180,100,.7)',2500)}}catch(e){}};ws.onclose=()=>{clearTimeout(timeout);wsConnected=false;wsRetries++;if(wsRetries>=2){goLocal()}else if(!reconnectTimer){reconnectTimer=setInterval(()=>{if(!wsConnected&&!localMode)connectWS()},3000)}};ws.onerror=()=>{clearTimeout(timeout)}}
-function sWS(m){if(ws&&ws.readyState===WebSocket.OPEN){ws.send(JSON.stringify(m));return true}return false}
-function addLeaf(t){if(!t||!t.trim()){setSt('请先写下你的心声…','rgba(240,180,80,.8)',2000);return}const c=t.trim().slice(0,80);const p=gLP(leaves.length);const d={text:c,xPercent:p.xPercent,yPercent:p.yPercent,timestamp:Date.now(),id:'leaf_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)};if(!localMode&&sWS({type:'add',leaf:d})){setSt(`🍃 已同步：「${c.length>12?c.slice(0,11)+'…':c}」`,'rgba(160,220,100,.8)',2500)}else{leaves.push(d);saveLocal();lC.appendChild(rL(d,leaves.length-1,true));cPB(p.xPercent,p.yPercent);uC();uS();setSt(`🍃 新叶已添加：「${c.length>12?c.slice(0,11)+'…':c}」`,'rgba(160,220,100,.8)',2500)}}
-function resetTree(){if(leaves.length>0&&!confirm('🍂 确定重置？所有树叶都会消失。'))return;if(!localMode&&sWS({type:'reset'})){}else{leaves=[];saveLocal();lC.innerHTML='';uC();uS();setSt('🍂 大树已重置','rgba(200,180,100,.7)',3000)}}
-function cPB(x,y){for(let i=0;i<10;i++){const p=document.createElement('div');p.className='particle';const a=(Math.PI*2*i)/10+(Math.random()-.5)*.5,d=20+Math.random()*35,sz=2+Math.random()*3;p.style.cssText=`left:${x}%;top:${y}%;width:${sz}px;height:${sz}px;background:${['#c8ff70','#ffe880','#90e040','#ffd060','#a0ff50'][i%5]};--px:${Math.cos(a)*d}px;--py:${Math.sin(a)*d}px;animation:particleBurst .7s ease-out forwards;`;tS.appendChild(p);setTimeout(()=>p.remove(),800)}}
+
+// ====== Firebase 实时同步 ======
+function initFirebaseSync(){
+    // 监听新增的叶子（实时）
+    dbRef.on('child_added', function(snapshot){
+        var leafData = snapshot.val();
+        if(!leafData) return;
+        var key = snapshot.key;
+        if(knownIds.has(key)) return;
+        knownIds.add(key);
+        leafData._key = key;
+        leaves.push(leafData);
+        // 如果是初次加载，不播放动画
+        if(firebaseOK){
+            lC.appendChild(rL(leafData, leaves.length-1, true));
+            cPB(leafData.xPercent, leafData.yPercent);
+        } else {
+            lC.appendChild(rL(leafData, leaves.length-1, false));
+        }
+        uC(); uS();
+    });
+
+    // 监听删除（重置时）
+    dbRef.on('child_removed', function(snapshot){
+        var key = snapshot.key;
+        knownIds.delete(key);
+        leaves = leaves.filter(function(l){return l._key !== key});
+        renderAll();
+    });
+
+    // 连接状态监测
+    var connRef = firebase.database().ref('.info/connected');
+    connRef.on('value', function(snap){
+        if(snap.val() === true){
+            firebaseOK = true;
+            syB.textContent = '☁️ 实时同步中';
+            syB.className = 'sync-badge';
+            setSt('☁️ 已连接云端，所有设备实时同步！','rgba(160,220,100,.8)',3000);
+        } else {
+            syB.textContent = '⏳ 连接中…';
+            syB.className = 'sync-badge';
+        }
+    });
+}
+
+// ====== 添加树叶 ======
+function addLeaf(t){
+    if(!t||!t.trim()){setSt('请先写下你的心声…','rgba(240,180,80,.8)',2000);return}
+    var c=t.trim().slice(0,80);
+    var p=gLP(leaves.length);
+    var leafData={
+        text:c,
+        xPercent:p.xPercent,
+        yPercent:p.yPercent,
+        timestamp:Date.now(),
+        id:'leaf_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)
+    };
+    // 写入 Firebase（会自动触发 child_added 回调）
+    dbRef.push(leafData).then(function(){
+        setSt('🍃 已同步：「'+(c.length>12?c.slice(0,11)+'…':c)+'」','rgba(160,220,100,.8)',2500);
+    }).catch(function(err){
+        console.error('写入失败:',err);
+        setSt('❌ 同步失败，请检查网络','rgba(240,100,80,.8)',3000);
+    });
+}
+
+// ====== 重置 ======
+function resetTree(){
+    if(leaves.length>0&&!confirm('🍂 确定重置？所有设备上的树叶都会消失。'))return;
+    dbRef.remove().then(function(){
+        leaves=[];knownIds.clear();lC.innerHTML='';uC();uS();
+        setSt('🍂 大树已重置','rgba(200,180,100,.7)',3000);
+    }).catch(function(err){
+        console.error('重置失败:',err);
+        setSt('❌ 重置失败，请检查网络','rgba(240,100,80,.8)',3000);
+    });
+}
+
+// ====== 粒子 ======
+function cPB(x,y){for(var i=0;i<10;i++){var p=document.createElement('div');p.className='particle';var a=(Math.PI*2*i)/10+(Math.random()-.5)*.5,d=20+Math.random()*35,sz=2+Math.random()*3;p.style.cssText='left:'+x+'%;top:'+y+'%;width:'+sz+'px;height:'+sz+'px;background:'+['#c8ff70','#ffe880','#90e040','#ffd060','#a0ff50'][i%5]+';--px:'+Math.cos(a)*d+'px;--py:'+Math.sin(a)*d+'px;animation:particleBurst .7s ease-out forwards;';tS.appendChild(p);setTimeout(function(){p.remove()},800)}}
+
+// ====== 弹窗 ======
 function showPopup(d){pT.textContent=d.text;pTi.textContent=new Date(d.timestamp).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});pO.classList.add('visible')}
-pO.addEventListener('click',(e)=>{if(e.target===pO)pO.classList.remove('visible')});pCl.addEventListener('click',()=>pO.classList.remove('visible'));
-function mkStars(){const c=document.getElementById('starsContainer');for(let i=0;i<80;i++){const s=document.createElement('div');s.className='star';const sz=.5+Math.random()*2.5;s.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*55}%;width:${sz}px;height:${sz}px;--dur:${1.5+Math.random()*5}s;--brightness:${.25+Math.random()*.75};animation-delay:${Math.random()*5}s;`;c.appendChild(s)}for(let i=0;i<3;i++){const ss=document.createElement('div');ss.className='shooting-star';const an=-30-Math.random()*20;ss.style.cssText=`left:${20+Math.random()*60}%;top:${5+Math.random()*20}%;--shoot-dur:${8+Math.random()*12}s;--shoot-angle:${an}deg;--shoot-x:${150+Math.random()*200}px;--shoot-y:${80+Math.random()*120}px;animation-delay:${i*5+Math.random()*8}s;`;c.appendChild(ss)}}
-function mkFF(){const c=document.getElementById('firefliesContainer');for(let i=0;i<8;i++){const f=document.createElement('div');f.className='firefly';const sz=3+Math.random()*4;f.style.cssText=`left:${15+Math.random()*70}%;top:${25+Math.random()*55}%;width:${sz}px;height:${sz}px;--fly-dur:${4+Math.random()*7}s;--fx:${(Math.random()-.5)*100}px;--fy:${(Math.random()-.5)*70}px;--fx2:${(Math.random()-.5)*120}px;--fy2:${(Math.random()-.5)*90}px;animation-delay:${Math.random()*8}s;`;c.appendChild(f)}}
-function mkPetals(){const c=document.getElementById('starsContainer');for(let i=0;i<5;i++){const p=document.createElement('div');p.className='petal';const sz=4+Math.random()*4;p.innerHTML=`<svg width="${sz}" height="${sz*1.3}" viewBox="0 0 10 13"><ellipse cx="5" cy="6.5" rx="4" ry="6" fill="rgba(180,255,120,.4)" stroke="rgba(120,200,80,.3)" stroke-width=".5"/></svg>`;p.style.cssText=`left:${10+Math.random()*80}%;top:-5%;--petal-dur:${12+Math.random()*18}s;--petal-x:${(Math.random()-.5)*150}px;--petal-y:${500+Math.random()*400}px;--petal-rot:${200+Math.random()*400}deg;animation-delay:${Math.random()*20}s;`;c.appendChild(p)}}
-sB.addEventListener('click',()=>{addLeaf(tI.value);tI.value='';tI.focus()});
-tI.addEventListener('keypress',(e)=>{if(e.key==='Enter'){addLeaf(tI.value);tI.value=''}});
+pO.addEventListener('click',function(e){if(e.target===pO)pO.classList.remove('visible')});
+pCl.addEventListener('click',function(){pO.classList.remove('visible')});
+
+// ====== 特效 ======
+function mkStars(){var c=document.getElementById('starsContainer');for(var i=0;i<80;i++){var s=document.createElement('div');s.className='star';var sz=.5+Math.random()*2.5;s.style.cssText='left:'+Math.random()*100+'%;top:'+Math.random()*55+'%;width:'+sz+'px;height:'+sz+'px;--dur:'+(1.5+Math.random()*5)+'s;--brightness:'+(0.25+Math.random()*.75)+';animation-delay:'+Math.random()*5+'s;';c.appendChild(s)}for(var i=0;i<3;i++){var ss=document.createElement('div');ss.className='shooting-star';var an=-30-Math.random()*20;ss.style.cssText='left:'+(20+Math.random()*60)+'%;top:'+(5+Math.random()*20)+'%;--shoot-dur:'+(8+Math.random()*12)+'s;--shoot-angle:'+an+'deg;--shoot-x:'+(150+Math.random()*200)+'px;--shoot-y:'+(80+Math.random()*120)+'px;animation-delay:'+(i*5+Math.random()*8)+'s;';c.appendChild(ss)}}
+function mkFF(){var c=document.getElementById('firefliesContainer');for(var i=0;i<8;i++){var f=document.createElement('div');f.className='firefly';var sz=3+Math.random()*4;f.style.cssText='left:'+(15+Math.random()*70)+'%;top:'+(25+Math.random()*55)+'%;width:'+sz+'px;height:'+sz+'px;--fly-dur:'+(4+Math.random()*7)+'s;--fx:'+((Math.random()-.5)*100)+'px;--fy:'+((Math.random()-.5)*70)+'px;--fx2:'+((Math.random()-.5)*120)+'px;--fy2:'+((Math.random()-.5)*90)+'px;animation-delay:'+Math.random()*8+'s;';c.appendChild(f)}}
+function mkPetals(){var c=document.getElementById('starsContainer');for(var i=0;i<5;i++){var p=document.createElement('div');p.className='petal';var sz=4+Math.random()*4;p.innerHTML='<svg width="'+sz+'" height="'+sz*1.3+'" viewBox="0 0 10 13"><ellipse cx="5" cy="6.5" rx="4" ry="6" fill="rgba(180,255,120,.4)" stroke="rgba(120,200,80,.3)" stroke-width=".5"/></svg>';p.style.cssText='left:'+(10+Math.random()*80)+'%;top:-5%;--petal-dur:'+(12+Math.random()*18)+'s;--petal-x:'+((Math.random()-.5)*150)+'px;--petal-y:'+(500+Math.random()*400)+'px;--petal-rot:'+(200+Math.random()*400)+'deg;animation-delay:'+Math.random()*20+'s;';c.appendChild(p)}}
+
+// ====== 事件 ======
+sB.addEventListener('click',function(){addLeaf(tI.value);tI.value='';tI.focus()});
+tI.addEventListener('keypress',function(e){if(e.key==='Enter'){addLeaf(tI.value);tI.value=''}});
 rB.addEventListener('click',resetTree);
-mkStars();mkFF();mkPetals();connectWS()
+
+// ====== 初始化 ======
+mkStars(); mkFF(); mkPetals(); initFirebaseSync();
+
 })();
 </script>
 </body>
